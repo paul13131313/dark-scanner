@@ -228,7 +228,7 @@
       <span class="icon">&#9645;</span> UPLOAD
     </button>
   </div>
-  <input type="file" id="file-input" accept="image/*" hidden>
+  <input type="file" id="file-input" accept="image/*,.heic,.heif" hidden>
   <div class="start-footer">SYSTEM: STANDBY</div>
 </div>
 
@@ -266,6 +266,7 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 <script type="module">
 import vision from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.js';
 const { ObjectDetector, FaceDetector, PoseLandmarker, FilesetResolver } = vision;
@@ -691,10 +692,19 @@ function drawGiantText(ctx) {
   ctx.fillText('RECON', W + 20, H * 0.52);
   ctx.textAlign = 'left';
 
-  // Japanese accent — 暗号走査 — bottom area, bigger and bolder
-  ctx.font = '900 88px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.09)';
-  ctx.fillText('暗号走査', 24, H - 440);
+  // ===== FULL-WIDTH BOLD WHITE TEXT — photo lower area =====
+  // Primary: big readable white English text at photo bottom
+  ctx.font = '900 86px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.22)';
+  ctx.fillText('SUBJECT', 20, H - 470);
+  ctx.font = '900 86px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.22)';
+  ctx.fillText('ANALYSIS', 20, H - 390);
+
+  // Secondary line — smaller but still clearly readable
+  ctx.font = '900 42px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.15)';
+  ctx.fillText('DARK PROTOCOL // 暗号走査', 20, H - 330);
 
   // "CLASSIFIED" — LARGE red stamp, mid-screen
   ctx.font = '900 56px "Share Tech Mono", monospace';
@@ -725,42 +735,23 @@ function drawGiantText(ctx) {
   ctx.fillText('NO UNAUTHORIZED ACCESS', W - 24, H * 0.78);
   ctx.textAlign = 'left';
 
-  // ===== FULL-WIDTH DIGITAL WARNING BANNERS =====
-  // These stretch across the entire canvas width like emergency alerts
-
-  // "WARNING" — full-width, top-mid area, with red background stripe
-  const warnY = H * 0.33;
-  ctx.fillStyle = 'rgba(255,20,20,0.06)';
-  ctx.fillRect(0, warnY - 50, W, 70);
-  ctx.font = '900 72px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,40,40,0.14)';
+  // ===== FULL-WIDTH DIGITAL ALERT STRIPE =====
+  // White readable text across photo lower-mid area
+  const alertY = H * 0.84;
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.fillRect(0, alertY - 22, W, 36);
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, alertY - 22); ctx.lineTo(W, alertY - 22); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, alertY + 14); ctx.lineTo(W, alertY + 14); ctx.stroke();
+  ctx.font = '900 24px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.30)';
   ctx.textAlign = 'center';
-  ctx.fillText('⚠  W A R N I N G  ⚠', W / 2, warnY);
+  ctx.fillText('■  CLASSIFIED  //  AUTHORIZED  PERSONNEL  ONLY  ■', W / 2, alertY + 4);
   ctx.textAlign = 'left';
 
-  // "UNAUTHORIZED ACCESS PROHIBITED" — full-width, lower area
-  const uaY = H * 0.84;
-  ctx.fillStyle = 'rgba(0,0,0,0.3)';
-  ctx.fillRect(0, uaY - 28, W, 40);
-  ctx.strokeStyle = 'rgba(255,60,60,0.2)'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(0, uaY - 28); ctx.lineTo(W, uaY - 28); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(0, uaY + 12); ctx.lineTo(W, uaY + 12); ctx.stroke();
-  ctx.font = '900 30px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.18)';
-  ctx.textAlign = 'center';
-  ctx.fillText('UNAUTHORIZED  ACCESS  PROHIBITED', W / 2, uaY + 2);
-  ctx.textAlign = 'left';
-
-  // "D A N G E R" — ultra-wide letter-spaced, behind photo subject
-  ctx.font = '900 120px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,30,30,0.06)';
-  ctx.textAlign = 'center';
-  ctx.fillText('D A N G E R', W / 2, H * 0.42);
-  ctx.textAlign = 'left';
-
-  // Repeating "CLASSIFIED" ticker tape across bottom
+  // Repeating "CLASSIFIED" ticker tape
   ctx.font = '900 14px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,60,60,0.12)';
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
   const tickerY = H * 0.88;
   let tickerX = 0;
   while (tickerX < W) {
@@ -1215,7 +1206,79 @@ function drawBottomFooter(ctx) {
   }
 }
 
-/* ===== LAYER 11: Scanlines ===== */
+/* ===== LAYER 11: Fingerprint biometric data ===== */
+function drawFingerprint(ctx) {
+  // Fingerprint positioned bottom-right of photo area, above the stats
+  const fpX = W - 180, fpY = H - 560;
+  const fpSize = 120;
+
+  // Panel background
+  drawPanel(ctx, fpX - 14, fpY - 24, fpSize + 28, fpSize + 64, { bg: 'rgba(0,0,0,0.85)', borderColor: 'rgba(255,60,60,0.2)' });
+  ctx.font = '700 9px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,60,60,0.8)';
+  ctx.fillText('■  BIOMETRIC_FP', fpX - 8, fpY - 10);
+
+  // Draw fingerprint using concentric ellipses with randomized deformation
+  const cx = fpX + fpSize / 2;
+  const cy = fpY + fpSize / 2;
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+  ctx.lineWidth = 1.5;
+
+  // Seed a pseudo-random pattern using time
+  const seed = Date.now() % 1000;
+
+  for (let ring = 0; ring < 12; ring++) {
+    const rx = 6 + ring * 4.5;
+    const ry = 8 + ring * 4.8;
+    ctx.beginPath();
+    for (let a = 0; a < Math.PI * 2; a += 0.08) {
+      // Add slight deformation for natural fingerprint look
+      const deform = Math.sin(a * 3 + ring * 0.7 + seed * 0.01) * (1 + ring * 0.3);
+      const px = cx + Math.cos(a) * (rx + deform);
+      const py = cy + Math.sin(a) * (ry + deform);
+      if (a === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.strokeStyle = `rgba(255,255,255,${0.15 + (ring % 3 === 0 ? 0.15 : 0)})`;
+    ctx.stroke();
+  }
+
+  // Arch lines at top of fingerprint
+  for (let i = 0; i < 5; i++) {
+    ctx.beginPath();
+    const archY = cy - fpSize * 0.35 + i * 5;
+    ctx.moveTo(cx - 30 - i * 3, archY + 10);
+    ctx.quadraticCurveTo(cx, archY - 10 + i * 2, cx + 30 + i * 3, archY + 10);
+    ctx.strokeStyle = `rgba(255,255,255,${0.12 + i * 0.03})`;
+    ctx.stroke();
+  }
+
+  // Scanning line effect
+  const scanLineY = fpY + (Date.now() % 3000) / 3000 * fpSize;
+  ctx.strokeStyle = 'rgba(255,60,60,0.5)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(fpX, scanLineY);
+  ctx.lineTo(fpX + fpSize, scanLineY);
+  ctx.stroke();
+
+  // Data labels below fingerprint
+  const labelY = fpY + fpSize + 10;
+  ctx.font = '900 14px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.fillText('FP-MATCH', fpX - 8, labelY);
+  ctx.font = '900 14px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,60,60,0.8)';
+  ctx.fillText(`${randInt(87,99)}.${randInt(1,9)}%`, fpX + 70, labelY);
+
+  // Minutiae count
+  ctx.font = '700 9px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.fillText(`MINUTIAE: ${randInt(42,78)}  TYPE: WHORL`, fpX - 8, labelY + 16);
+  ctx.fillText(`LATENT: ${randHex(8).toUpperCase()}`, fpX - 8, labelY + 28);
+}
+
+/* ===== LAYER 12: Scanlines ===== */
 function drawScanlines(ctx) {
   ctx.fillStyle = 'rgba(0,0,0,0.04)';
   for (let y = 0; y < H; y += 3) ctx.fillRect(0, y, W, 1);
@@ -1257,7 +1320,10 @@ async function renderHUD(sourceImage, results) {
   // Layer 10: Bottom footer
   drawBottomFooter(ctx);
 
-  // Layer 11: Global effects
+  // Layer 11: Fingerprint biometric
+  drawFingerprint(ctx);
+
+  // Layer 12: Global effects
   drawCornerBrackets(ctx, 4, 4, W-8, H-8, 40, 1.5, 'rgba(255,255,255,0.08)');
   drawScanlines(ctx);
 }
@@ -1302,10 +1368,24 @@ btnGallery.addEventListener('click', () => {
 });
 
 fileInput.addEventListener('change', async (e) => {
-  const file = e.target.files[0];
+  let file = e.target.files[0];
   if (!file) return;
 
   stopCamera();
+
+  // HEIC/HEIF conversion for iPhone photos
+  const isHEIC = file.type === 'image/heic' || file.type === 'image/heif'
+    || /\.heic$/i.test(file.name) || /\.heif$/i.test(file.name);
+  if (isHEIC && window.heic2any) {
+    try {
+      const startEl = document.querySelector('.start-footer');
+      if (startEl) startEl.textContent = 'CONVERTING HEIC...';
+      const blob = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 });
+      file = new File([blob], file.name.replace(/\.heic$/i, '.jpg'), { type: 'image/jpeg' });
+    } catch (err) {
+      console.error('HEIC conversion failed:', err);
+    }
+  }
 
   const img = new Image();
   img.onload = async () => {
