@@ -1,0 +1,1364 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>DARK SCANNER — Tactical Image Analysis</title>
+
+<!-- OGP -->
+<meta property="og:title" content="DARK SCANNER">
+<meta property="og:description" content="MediaPipeで人物・顔・ポーズを検出し、CIA/軍事偵察分析風のダークテックHUDで加工する画像ジェネレーター">
+<meta property="og:image" content="https://paul13131313.github.io/dark-scanner/ogp.png">
+<meta property="og:url" content="https://paul13131313.github.io/dark-scanner/">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+
+<!-- Favicon -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23000'/><text x='50' y='62' text-anchor='middle' font-size='50' fill='%23fff'>⊕</text></svg>">
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #000; color: #fff;
+    font-family: 'Share Tech Mono', 'SF Mono', 'Fira Code', 'Courier New', monospace;
+    overflow: hidden; text-transform: uppercase;
+    letter-spacing: 1px;
+    -webkit-user-select: none; user-select: none;
+    touch-action: manipulation;
+  }
+
+  /* ===== START SCREEN ===== */
+  .screen { position: fixed; inset: 0; display: none; z-index: 10; }
+  .screen.active { display: flex; }
+
+  #start-screen {
+    flex-direction: column; align-items: center; justify-content: center;
+    background: #000;
+  }
+  #start-screen::before {
+    content: ''; position: absolute; inset: 0;
+    background:
+      repeating-linear-gradient(0deg, transparent, transparent 79px, rgba(255,255,255,0.03) 79px, rgba(255,255,255,0.03) 80px),
+      repeating-linear-gradient(90deg, transparent, transparent 79px, rgba(255,255,255,0.03) 79px, rgba(255,255,255,0.03) 80px);
+    pointer-events: none;
+  }
+  .start-title {
+    font-size: 28px; letter-spacing: 8px; font-weight: 700;
+    color: rgba(255,255,255,0.9); margin-bottom: 8px; position: relative;
+  }
+  .start-sub {
+    font-size: 10px; letter-spacing: 3px;
+    color: rgba(255,255,255,0.3); margin-bottom: 6px;
+  }
+  .start-version {
+    font-size: 9px; letter-spacing: 2px;
+    color: rgba(255,255,255,0.15); margin-bottom: 40px;
+  }
+  #model-status {
+    font-size: 10px; letter-spacing: 2px;
+    color: rgba(255,255,255,0.4); margin-bottom: 30px;
+    min-height: 16px;
+  }
+  .source-buttons {
+    display: flex; flex-direction: column; gap: 12px;
+    width: 220px; position: relative;
+  }
+  .source-btn {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: rgba(255,255,255,0.7);
+    padding: 16px 24px; font-size: 13px; letter-spacing: 3px;
+    font-family: inherit; text-transform: uppercase;
+    cursor: pointer; transition: all 0.3s;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+  }
+  .source-btn:hover {
+    background: rgba(255,255,255,0.1);
+    border-color: rgba(255,255,255,0.4);
+    color: #fff;
+  }
+  .source-btn:disabled {
+    opacity: 0.2; cursor: default; pointer-events: none;
+  }
+  .source-btn .icon { font-size: 16px; }
+  .start-footer {
+    position: absolute; bottom: 30px;
+    font-size: 9px; letter-spacing: 2px;
+    color: rgba(255,255,255,0.1);
+  }
+
+  /* ===== CAMERA SCREEN ===== */
+  #camera-screen {
+    flex-direction: column; align-items: center; justify-content: center;
+    background: #000;
+  }
+  #video {
+    width: 100%; height: 100%; object-fit: cover;
+    position: absolute; inset: 0;
+  }
+  .camera-hud {
+    position: absolute; inset: 0; pointer-events: none;
+  }
+  .camera-corner {
+    position: absolute; width: 30px; height: 30px;
+    border-color: rgba(255,255,255,0.4); border-style: solid; border-width: 0;
+  }
+  .camera-corner.tl { top: 20px; left: 20px; border-top-width: 2px; border-left-width: 2px; }
+  .camera-corner.tr { top: 20px; right: 20px; border-top-width: 2px; border-right-width: 2px; }
+  .camera-corner.bl { bottom: 100px; left: 20px; border-bottom-width: 2px; border-left-width: 2px; }
+  .camera-corner.br { bottom: 100px; right: 20px; border-bottom-width: 2px; border-right-width: 2px; }
+  .camera-label {
+    position: absolute; top: 30px; left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px; letter-spacing: 3px;
+    color: rgba(255,255,255,0.4);
+  }
+  .camera-actions {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px; gap: 24px; z-index: 5;
+    background: linear-gradient(transparent, rgba(0,0,0,0.8));
+  }
+  #btn-scan {
+    width: 64px; height: 64px; border-radius: 50%;
+    background: transparent;
+    border: 3px solid rgba(255,255,255,0.8);
+    cursor: pointer; position: relative;
+    transition: all 0.2s;
+  }
+  #btn-scan::after {
+    content: ''; position: absolute;
+    top: 5px; left: 5px; right: 5px; bottom: 5px;
+    border-radius: 50%;
+    background: #ff3333;
+    transition: all 0.2s;
+  }
+  #btn-scan:active::after { transform: scale(0.9); }
+  .cam-ctrl-btn {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: rgba(255,255,255,0.7);
+    font-size: 18px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-family: inherit;
+  }
+  #btn-back-start {
+    position: absolute; top: 16px; left: 16px;
+    width: 40px; height: 40px; border-radius: 50%;
+    background: rgba(0,0,0,0.5);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: rgba(255,255,255,0.7);
+    font-size: 18px; cursor: pointer; z-index: 5;
+    display: flex; align-items: center; justify-content: center;
+    font-family: inherit;
+  }
+
+  /* ===== ANALYZING SCREEN ===== */
+  #analyzing-screen {
+    flex-direction: column; align-items: center; justify-content: center;
+    background: #000;
+  }
+  .analyze-title {
+    font-size: 14px; letter-spacing: 4px;
+    color: rgba(255,255,255,0.7); margin-bottom: 24px;
+  }
+  .progress-bar {
+    width: 260px; height: 4px;
+    background: rgba(255,255,255,0.08); margin-bottom: 16px;
+  }
+  .progress-fill {
+    height: 100%; width: 0%;
+    background: #fff; transition: width 0.3s;
+  }
+  .analyze-detail {
+    font-size: 9px; letter-spacing: 2px;
+    color: rgba(255,255,255,0.3);
+  }
+
+  /* ===== RESULT SCREEN ===== */
+  #result-screen {
+    flex-direction: column; align-items: center; justify-content: center;
+    background: #000; overflow: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  #result-screen canvas {
+    max-width: 100%; max-height: calc(100vh - 80px);
+    object-fit: contain;
+  }
+  .result-actions {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    display: flex; justify-content: center; gap: 12px;
+    padding: 16px;
+    background: linear-gradient(transparent, rgba(0,0,0,0.95));
+    z-index: 15;
+  }
+  .result-btn {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.25);
+    color: rgba(255,255,255,0.8);
+    padding: 12px 28px; font-size: 12px; letter-spacing: 3px;
+    font-family: inherit; text-transform: uppercase;
+    cursor: pointer; transition: all 0.3s;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .result-btn:hover {
+    background: rgba(255,255,255,0.1);
+    border-color: rgba(255,255,255,0.5);
+    color: #fff;
+  }
+  .result-btn .icon { font-size: 14px; }
+</style>
+</head>
+<body>
+
+<!-- START SCREEN -->
+<div id="start-screen" class="screen active">
+  <div class="start-title">DARK SCANNER</div>
+  <div class="start-sub">TACTICAL IMAGE ANALYSIS SYSTEM</div>
+  <div class="start-version">RECON v3.1.0</div>
+  <div id="model-status">INITIALIZING SYSTEM...</div>
+  <div class="source-buttons">
+    <button class="source-btn" id="btn-camera" disabled>
+      <span class="icon">&#9711;</span> CAMERA
+    </button>
+    <button class="source-btn" id="btn-upload" disabled>
+      <span class="icon">&#9645;</span> UPLOAD
+    </button>
+  </div>
+  <input type="file" id="file-input" accept="image/*" hidden>
+  <div class="start-footer">SYSTEM: STANDBY</div>
+</div>
+
+<!-- CAMERA SCREEN -->
+<div id="camera-screen" class="screen">
+  <video id="video" autoplay playsinline muted></video>
+  <button id="btn-back-start">&larr;</button>
+  <div class="camera-hud">
+    <div class="camera-corner tl"></div>
+    <div class="camera-corner tr"></div>
+    <div class="camera-corner bl"></div>
+    <div class="camera-corner br"></div>
+    <div class="camera-label">SCANNING TARGET...</div>
+  </div>
+  <div class="camera-actions">
+    <button class="cam-ctrl-btn" id="btn-flip">&#8635;</button>
+    <button id="btn-scan"></button>
+    <button class="cam-ctrl-btn" id="btn-gallery">&#9645;</button>
+  </div>
+</div>
+
+<!-- ANALYZING SCREEN -->
+<div id="analyzing-screen" class="screen">
+  <div class="analyze-title">&#9654; ANALYZING...</div>
+  <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+  <div class="analyze-detail" id="analyze-detail">INITIALIZING DETECTORS</div>
+</div>
+
+<!-- RESULT SCREEN -->
+<div id="result-screen" class="screen">
+  <canvas id="hud-canvas" width="1080" height="1920"></canvas>
+  <div class="result-actions">
+    <button class="result-btn" id="btn-save"><span class="icon">&#8681;</span> SAVE</button>
+    <button class="result-btn" id="btn-new"><span class="icon">&#9711;</span> NEW</button>
+  </div>
+</div>
+
+<script type="module">
+import vision from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.js';
+const { ObjectDetector, FaceDetector, PoseLandmarker, FilesetResolver } = vision;
+
+/* ===== STATE ===== */
+let objectDetector = null;
+let faceDetector = null;
+let poseLandmarker = null;
+let currentFacingMode = 'environment';
+let currentStream = null;
+
+/* ===== ELEMENTS ===== */
+const startScreen = document.getElementById('start-screen');
+const cameraScreen = document.getElementById('camera-screen');
+const analyzingScreen = document.getElementById('analyzing-screen');
+const resultScreen = document.getElementById('result-screen');
+const modelStatus = document.getElementById('model-status');
+const btnCamera = document.getElementById('btn-camera');
+const btnUpload = document.getElementById('btn-upload');
+const btnScan = document.getElementById('btn-scan');
+const btnFlip = document.getElementById('btn-flip');
+const btnGallery = document.getElementById('btn-gallery');
+const btnBackStart = document.getElementById('btn-back-start');
+const btnSave = document.getElementById('btn-save');
+const btnNew = document.getElementById('btn-new');
+const fileInput = document.getElementById('file-input');
+const videoEl = document.getElementById('video');
+const progressFill = document.getElementById('progress-fill');
+const analyzeDetail = document.getElementById('analyze-detail');
+const hudCanvas = document.getElementById('hud-canvas');
+const hudCtx = hudCanvas.getContext('2d');
+
+/* ===== CONSTANTS ===== */
+const W = 1080;
+const H = 1920;
+const IMG_Y = 140;
+const IMG_H = 1080;
+const PANEL_Y = 1220;
+const PANEL_H = 400;
+const BOTTOM_Y = 1620;
+const BOTTOM_H = 300;
+const MARGIN = 40;
+
+/* ===== POSE CONNECTIONS ===== */
+const POSE_CONNECTIONS = [
+  [0,1],[1,2],[2,3],[3,7],[0,4],[4,5],[5,6],[6,8],
+  [9,10],[11,12],[11,13],[13,15],[15,17],[15,19],[15,21],
+  [17,19],[12,14],[14,16],[16,18],[16,20],[16,22],[18,20],
+  [11,23],[12,24],[23,24],[23,25],[24,26],[25,27],[26,28],
+  [27,29],[28,30],[29,31],[30,32],[27,31],[28,32]
+];
+
+/* ===== SCREEN MANAGEMENT ===== */
+function showScreen(id) {
+  [startScreen, cameraScreen, analyzingScreen, resultScreen].forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+/* ===== MODEL INITIALIZATION ===== */
+async function initModels() {
+  try {
+    modelStatus.textContent = 'LOADING VISION RUNTIME...';
+    const filesetResolver = await FilesetResolver.forVisionTasks(
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm'
+    );
+
+    modelStatus.textContent = 'LOADING MODEL 1/3 — OBJECT DETECTOR...';
+    objectDetector = await ObjectDetector.createFromOptions(filesetResolver, {
+      baseOptions: {
+        modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite',
+        delegate: 'GPU'
+      },
+      maxResults: 10,
+      scoreThreshold: 0.3,
+      runningMode: 'IMAGE'
+    });
+
+    modelStatus.textContent = 'LOADING MODEL 2/3 — FACE DETECTOR...';
+    faceDetector = await FaceDetector.createFromOptions(filesetResolver, {
+      baseOptions: {
+        modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite',
+        delegate: 'GPU'
+      },
+      runningMode: 'IMAGE'
+    });
+
+    modelStatus.textContent = 'LOADING MODEL 3/3 — POSE LANDMARKER...';
+    poseLandmarker = await PoseLandmarker.createFromOptions(filesetResolver, {
+      baseOptions: {
+        modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',
+        delegate: 'GPU'
+      },
+      runningMode: 'IMAGE',
+      numPoses: 5
+    });
+
+    modelStatus.textContent = 'ALL SYSTEMS OPERATIONAL';
+    btnCamera.disabled = false;
+    btnUpload.disabled = false;
+    document.querySelector('.start-footer').textContent = 'SYSTEM: READY';
+  } catch (e) {
+    console.error('Model init error:', e);
+    modelStatus.textContent = 'ERROR: ' + e.message;
+  }
+}
+
+/* ===== CAMERA ===== */
+async function startCamera() {
+  try {
+    if (currentStream) {
+      currentStream.getTracks().forEach(t => t.stop());
+    }
+    currentStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: currentFacingMode, width: { ideal: 1080 }, height: { ideal: 1920 } }
+    });
+    videoEl.srcObject = currentStream;
+    await new Promise(r => { videoEl.onloadeddata = r; });
+  } catch (e) {
+    console.error('Camera error:', e);
+    alert('CAMERA ACCESS DENIED');
+    showScreen('start-screen');
+  }
+}
+
+function stopCamera() {
+  if (currentStream) {
+    currentStream.getTracks().forEach(t => t.stop());
+    currentStream = null;
+  }
+}
+
+function captureFrame() {
+  const c = document.createElement('canvas');
+  c.width = videoEl.videoWidth;
+  c.height = videoEl.videoHeight;
+  const cx = c.getContext('2d');
+  cx.drawImage(videoEl, 0, 0);
+  return c;
+}
+
+/* ===== DETECTION ===== */
+async function analyzeImage(imageSource) {
+  showScreen('analyzing-screen');
+  progressFill.style.width = '0%';
+
+  analyzeDetail.textContent = 'RUNNING OBJECT DETECTION...';
+  progressFill.style.width = '10%';
+  await new Promise(r => setTimeout(r, 50));
+  const t0 = performance.now();
+  const objectResults = objectDetector.detect(imageSource);
+  progressFill.style.width = '33%';
+
+  analyzeDetail.textContent = 'RUNNING FACE DETECTION...';
+  await new Promise(r => setTimeout(r, 50));
+  const faceResults = faceDetector.detect(imageSource);
+  progressFill.style.width = '66%';
+
+  analyzeDetail.textContent = 'RUNNING POSE ESTIMATION...';
+  await new Promise(r => setTimeout(r, 50));
+  const poseResults = poseLandmarker.detect(imageSource);
+  progressFill.style.width = '90%';
+
+  const procTime = Math.round(performance.now() - t0);
+
+  analyzeDetail.textContent = 'GENERATING HUD OVERLAY...';
+  progressFill.style.width = '100%';
+  await new Promise(r => setTimeout(r, 200));
+
+  return { objectResults, faceResults, poseResults, procTime };
+}
+
+/* ===== FAKE DATA GENERATORS ===== */
+function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+function randFloat(min, max, dec) { return (Math.random() * (max - min) + min).toFixed(dec); }
+function randHex(len) { return Array.from({length: len}, () => Math.floor(Math.random() * 16).toString(16)).join('').toUpperCase(); }
+
+function formatTimestamp() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth()+1).padStart(2,'0');
+  const d = String(now.getDate()).padStart(2,'0');
+  const hh = String(now.getHours()).padStart(2,'0');
+  const mm = String(now.getMinutes()).padStart(2,'0');
+  const ss = String(now.getSeconds()).padStart(2,'0');
+  return { date: `${y}.${m}.${d}`, time: `${hh}:${mm}:${ss} JST` };
+}
+
+/* ===== HUD DRAWING FUNCTIONS ===== */
+
+function drawBackground(ctx) {
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, W, H);
+}
+
+function drawMainImage(ctx, sourceImage) {
+  const sW = sourceImage.width;
+  const sH = sourceImage.height;
+  const scale = Math.max(W / sW, IMG_H / sH);
+  const dW = sW * scale;
+  const dH = sH * scale;
+  const offsetX = (W - dW) / 2;
+  const offsetY = (IMG_H - dH) / 2;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, IMG_Y, W, IMG_H);
+  ctx.clip();
+
+  // Draw image with filters
+  ctx.filter = 'saturate(0.7) contrast(1.1)';
+  ctx.drawImage(sourceImage, offsetX, IMG_Y + offsetY, dW, dH);
+  ctx.filter = 'none';
+
+  ctx.restore();
+
+  // Vignette
+  const grad = ctx.createRadialGradient(W/2, IMG_Y + IMG_H/2, IMG_H * 0.25, W/2, IMG_Y + IMG_H/2, IMG_H * 0.7);
+  grad.addColorStop(0, 'rgba(0,0,0,0)');
+  grad.addColorStop(1, 'rgba(0,0,0,0.5)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, IMG_Y, W, IMG_H);
+
+  // Grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < W; x += 80) {
+    ctx.beginPath(); ctx.moveTo(x, IMG_Y); ctx.lineTo(x, IMG_Y + IMG_H); ctx.stroke();
+  }
+  for (let y = IMG_Y; y < IMG_Y + IMG_H; y += 80) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+
+  // Image zone corner marks
+  drawCornerBrackets(ctx, 0, IMG_Y, W, IMG_H, 30, 2, 'rgba(255,255,255,0.4)');
+}
+
+function drawCornerBrackets(ctx, x, y, w, h, len, lw, color) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lw;
+  // TL
+  ctx.beginPath(); ctx.moveTo(x, y + len); ctx.lineTo(x, y); ctx.lineTo(x + len, y); ctx.stroke();
+  // TR
+  ctx.beginPath(); ctx.moveTo(x + w - len, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + len); ctx.stroke();
+  // BL
+  ctx.beginPath(); ctx.moveTo(x, y + h - len); ctx.lineTo(x, y + h); ctx.lineTo(x + len, y + h); ctx.stroke();
+  // BR
+  ctx.beginPath(); ctx.moveTo(x + w - len, y + h); ctx.lineTo(x + w, y + h); ctx.lineTo(x + w, y + h - len); ctx.stroke();
+}
+
+function drawObjectBrackets(ctx, objectResults, sourceImage) {
+  const sW = sourceImage.width;
+  const sH = sourceImage.height;
+  const scale = Math.max(W / sW, IMG_H / sH);
+  const dW = sW * scale;
+  const dH = sH * scale;
+  const offsetX = (W - dW) / 2;
+  const offsetY = (IMG_H - dH) / 2;
+
+  const subjectLabels = ['ALPHA', 'BRAVO', 'CHARLIE', 'DELTA', 'ECHO'];
+  let personIdx = 0;
+
+  for (let i = 0; i < objectResults.detections.length; i++) {
+    const det = objectResults.detections[i];
+    const box = det.boundingBox;
+    const cat = det.categories[0];
+    const label = cat.categoryName.toUpperCase();
+    const score = Math.round(cat.score * 100);
+
+    // Map coordinates from source image to canvas
+    const bx = box.originX * scale + offsetX;
+    const by = box.originY * scale + offsetY + IMG_Y;
+    const bw = box.width * scale;
+    const bh = box.height * scale;
+
+    // Clip to image zone
+    if (by + bh < IMG_Y || by > IMG_Y + IMG_H) continue;
+
+    const bracketLen = Math.min(bw, bh) * 0.2;
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+    ctx.lineWidth = 1.5;
+
+    // Corner brackets
+    // TL
+    ctx.beginPath(); ctx.moveTo(bx, by + bracketLen); ctx.lineTo(bx, by); ctx.lineTo(bx + bracketLen, by); ctx.stroke();
+    // TR
+    ctx.beginPath(); ctx.moveTo(bx + bw - bracketLen, by); ctx.lineTo(bx + bw, by); ctx.lineTo(bx + bw, by + bracketLen); ctx.stroke();
+    // BL
+    ctx.beginPath(); ctx.moveTo(bx, by + bh - bracketLen); ctx.lineTo(bx, by + bh); ctx.lineTo(bx + bracketLen, by + bh); ctx.stroke();
+    // BR
+    ctx.beginPath(); ctx.moveTo(bx + bw - bracketLen, by + bh); ctx.lineTo(bx + bw, by + bh); ctx.lineTo(bx + bw, by + bh - bracketLen); ctx.stroke();
+
+    // Crosshair center
+    const cx = bx + bw / 2;
+    const cy = by + bh / 2;
+    const crossR = Math.min(bw, bh) * 0.08;
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, crossR, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx - crossR * 1.8, cy); ctx.lineTo(cx + crossR * 1.8, cy);
+    ctx.moveTo(cx, cy - crossR * 1.8); ctx.lineTo(cx, cy + crossR * 1.8);
+    ctx.stroke();
+
+    // Label
+    const isPerson = label === 'PERSON';
+    const displayLabel = isPerson ? `SUBJ-${subjectLabels[personIdx] || personIdx}` : label;
+    if (isPerson) personIdx++;
+
+    ctx.font = '11px "Share Tech Mono", monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.textAlign = 'left';
+    ctx.fillText(displayLabel, bx + 4, by - 8);
+    ctx.textAlign = 'right';
+    ctx.fillText(`${score}%`, bx + bw - 4, by - 8);
+    ctx.textAlign = 'left';
+  }
+}
+
+function drawPoseSkeleton(ctx, poseResults, sourceImage) {
+  const sW = sourceImage.width;
+  const sH = sourceImage.height;
+  const scale = Math.max(W / sW, IMG_H / sH);
+  const dW = sW * scale;
+  const dH = sH * scale;
+  const offsetX = (W - dW) / 2;
+  const offsetY = (IMG_H - dH) / 2;
+
+  for (const landmarks of poseResults.landmarks) {
+    // Convert normalized coords to canvas coords
+    const pts = landmarks.map(lm => ({
+      x: lm.x * sW * scale + offsetX,
+      y: lm.y * sH * scale + offsetY + IMG_Y,
+      v: lm.visibility
+    }));
+
+    // Draw connections
+    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+    ctx.lineWidth = 1;
+    for (const [a, b] of POSE_CONNECTIONS) {
+      if (a >= pts.length || b >= pts.length) continue;
+      if (pts[a].v < 0.4 || pts[b].v < 0.4) continue;
+      ctx.beginPath();
+      ctx.moveTo(pts[a].x, pts[a].y);
+      ctx.lineTo(pts[b].x, pts[b].y);
+      ctx.stroke();
+    }
+
+    // Draw landmark dots
+    for (let i = 0; i < pts.length; i++) {
+      if (pts[i].v < 0.4) continue;
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.beginPath();
+      ctx.arc(pts[i].x, pts[i].y, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Angle displays at key joints (right elbow=14, left knee=25, right shoulder=12)
+    const angleJoints = [
+      { joint: 14, from: 12, to: 16 },
+      { joint: 25, from: 23, to: 27 },
+      { joint: 12, from: 11, to: 14 }
+    ];
+    for (const aj of angleJoints) {
+      if (aj.joint >= pts.length || aj.from >= pts.length || aj.to >= pts.length) continue;
+      if (pts[aj.joint].v < 0.4 || pts[aj.from].v < 0.4 || pts[aj.to].v < 0.4) continue;
+      const angle = calcAngle(pts[aj.from], pts[aj.joint], pts[aj.to]);
+      ctx.font = '9px "Share Tech Mono", monospace';
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.fillText(`${angle}°`, pts[aj.joint].x + 6, pts[aj.joint].y - 6);
+    }
+  }
+}
+
+function calcAngle(a, b, c) {
+  const ab = { x: a.x - b.x, y: a.y - b.y };
+  const cb = { x: c.x - b.x, y: c.y - b.y };
+  const dot = ab.x * cb.x + ab.y * cb.y;
+  const magAB = Math.sqrt(ab.x * ab.x + ab.y * ab.y);
+  const magCB = Math.sqrt(cb.x * cb.x + cb.y * cb.y);
+  if (magAB === 0 || magCB === 0) return 0;
+  const cosAngle = Math.max(-1, Math.min(1, dot / (magAB * magCB)));
+  return Math.round(Math.acos(cosAngle) * 180 / Math.PI);
+}
+
+function drawFaceTargeting(ctx, faceResults, sourceImage) {
+  const sW = sourceImage.width;
+  const sH = sourceImage.height;
+  const scale = Math.max(W / sW, IMG_H / sH);
+  const offsetX = (W - sW * scale) / 2;
+  const offsetY = (IMG_H - sH * scale) / 2;
+
+  for (let i = 0; i < faceResults.detections.length; i++) {
+    const det = faceResults.detections[i];
+    const box = det.boundingBox;
+
+    const cx = box.originX * scale + offsetX + (box.width * scale) / 2;
+    const cy = box.originY * scale + offsetY + (box.height * scale) / 2 + IMG_Y;
+    const radius = Math.max(box.width, box.height) * scale * 0.6;
+
+    // Outer dashed ring
+    ctx.setLineDash([8, 6]);
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Inner ring
+    ctx.setLineDash([]);
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius * 0.7, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Tick marks at 12, 3, 6, 9 o'clock
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+    ctx.lineWidth = 2;
+    const tickLen = 8;
+    for (let angle = 0; angle < 4; angle++) {
+      const a = angle * Math.PI / 2;
+      const x1 = cx + Math.cos(a) * (radius - tickLen);
+      const y1 = cy + Math.sin(a) * (radius - tickLen);
+      const x2 = cx + Math.cos(a) * (radius + tickLen);
+      const y2 = cy + Math.sin(a) * (radius + tickLen);
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    }
+
+    // Crosshair
+    const crossLen = radius * 0.25;
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx - crossLen, cy); ctx.lineTo(cx + crossLen, cy);
+    ctx.moveTo(cx, cy - crossLen); ctx.lineTo(cx, cy + crossLen);
+    ctx.stroke();
+
+    // Label
+    ctx.font = '10px "Share Tech Mono", monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.textAlign = 'center';
+    ctx.fillText('FACE DETECTED', cx, cy - radius - 12);
+    ctx.textAlign = 'left';
+  }
+}
+
+function drawConnectionLines(ctx, results, sourceImage) {
+  const sW = sourceImage.width;
+  const sH = sourceImage.height;
+  const scale = Math.max(W / sW, IMG_H / sH);
+  const offsetX = (W - sW * scale) / 2;
+  const offsetY = (IMG_H - sH * scale) / 2;
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
+
+  // Face → facial scan panel
+  if (results.faceResults.detections.length > 0) {
+    const face = results.faceResults.detections[0];
+    const box = face.boundingBox;
+    const fx = box.originX * scale + offsetX + (box.width * scale) / 2;
+    const fy = box.originY * scale + offsetY + (box.height * scale) + IMG_Y;
+    const targetX = MARGIN + 20;
+    const targetY = PANEL_Y;
+
+    ctx.beginPath();
+    ctx.moveTo(fx, fy);
+    ctx.lineTo(fx, PANEL_Y - 10);
+    ctx.lineTo(targetX, PANEL_Y - 10);
+    ctx.lineTo(targetX, targetY);
+    ctx.stroke();
+
+    // Dot at bend point
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.beginPath(); ctx.arc(fx, PANEL_Y - 10, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.setLineDash([4, 4]);
+  }
+
+  // Person objects → subject panel
+  const persons = results.objectResults.detections.filter(d => d.categories[0].categoryName === 'person');
+  for (let i = 0; i < Math.min(persons.length, 2); i++) {
+    const box = persons[i].boundingBox;
+    const px = box.originX * scale + offsetX + (box.width * scale) / 2;
+    const py = box.originY * scale + offsetY + (box.height * scale) + IMG_Y;
+    const targetX = W - MARGIN - 20;
+
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    ctx.lineTo(px, PANEL_Y - 20 - i * 15);
+    ctx.lineTo(targetX, PANEL_Y - 20 - i * 15);
+    ctx.lineTo(targetX, PANEL_Y);
+    ctx.stroke();
+  }
+
+  ctx.setLineDash([]);
+}
+
+function drawHeader(ctx) {
+  // Background
+  ctx.fillStyle = 'rgba(0,0,0,0.85)';
+  ctx.fillRect(0, 0, W, 60);
+
+  const ts = formatTimestamp();
+
+  // Left: title
+  ctx.font = '700 14px "Share Tech Mono", monospace';
+  ctx.letterSpacing = '3px';
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'left';
+  ctx.fillText('DARK SCANNER', MARGIN, 28);
+
+  // Center: cam ID
+  ctx.font = '11px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.textAlign = 'center';
+  ctx.fillText('CAM-01', W / 2 - 40, 28);
+
+  // REC indicator
+  ctx.fillStyle = '#ff3333';
+  ctx.beginPath(); ctx.arc(W / 2 + 20, 24, 4, 0, Math.PI * 2); ctx.fill();
+  ctx.font = '11px "Share Tech Mono", monospace';
+  ctx.fillStyle = '#ff3333';
+  ctx.textAlign = 'left';
+  ctx.fillText('REC', W / 2 + 28, 28);
+
+  // Right: timestamp
+  ctx.textAlign = 'right';
+  ctx.font = '11px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  ctx.fillText(ts.date, W - MARGIN, 22);
+  ctx.fillText(ts.time, W - MARGIN, 40);
+  ctx.textAlign = 'left';
+
+  // Bottom line
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, 60); ctx.lineTo(W, 60); ctx.stroke();
+}
+
+function drawTopDataStrip(ctx) {
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  ctx.fillRect(0, 60, W, 80);
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, 140); ctx.lineTo(W, 140); ctx.stroke();
+
+  ctx.font = '9px "Share Tech Mono", monospace';
+
+  const row1 = [
+    { label: 'GPS:', value: `${randFloat(35.65, 35.70, 4)}°N ${randFloat(139.60, 139.80, 4)}°E`, x: MARGIN },
+    { label: 'ALT:', value: `${randInt(10, 120)}M`, x: 360 },
+    { label: 'ISO:', value: `${[1600, 3200, 6400][randInt(0,2)]}`, x: 460 },
+    { label: 'F/', value: `${['1.8','2.0','2.8'][randInt(0,2)]}`, x: 560 },
+    { label: 'SS:', value: `1/${[60,125,250,500][randInt(0,3)]}S`, x: 640 },
+    { label: 'FL:', value: `${randInt(24,85)}MM`, x: 780 },
+    { label: 'EV:', value: `${randFloat(-2, 2, 1)}`, x: 880 },
+    { label: 'WB:', value: `${randInt(3200, 6500)}K`, x: 970 },
+  ];
+
+  const row2 = [
+    { label: 'TEMP:', value: `${randFloat(18, 32, 1)}°C`, x: MARGIN },
+    { label: 'HUM:', value: `${randInt(30, 80)}%`, x: 220 },
+    { label: 'WIND:', value: `${randFloat(0, 8, 1)}M/S ${['N','NE','E','SE','S','SW','W','NW'][randInt(0,7)]}`, x: 340 },
+    { label: 'LUX:', value: `${randInt(200, 2000)}`, x: 580 },
+    { label: 'BAND:', value: `${[450, 550, 700, 850][randInt(0,3)]}NM`, x: 700 },
+    { label: 'GAIN:', value: `${randFloat(0, 12, 1)}DB`, x: 840 },
+    { label: 'FPS:', value: `${[24,30,60][randInt(0,2)]}`, x: 970 },
+  ];
+
+  for (const item of row1) {
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.fillText(item.label, item.x, 88);
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.fillText(item.value, item.x + ctx.measureText(item.label).width + 4, 88);
+  }
+
+  for (const item of row2) {
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.fillText(item.label, item.x, 118);
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.fillText(item.value, item.x + ctx.measureText(item.label).width + 4, 118);
+  }
+}
+
+function drawAnalysisPanel(ctx, results, sourceImage) {
+  // Background
+  ctx.fillStyle = 'rgba(0,0,0,0.85)';
+  ctx.fillRect(0, PANEL_Y, W, PANEL_H);
+
+  // Top line
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, PANEL_Y); ctx.lineTo(W, PANEL_Y); ctx.stroke();
+
+  // ===== SUBJECT DATA PANEL (left column, 0-520px) =====
+  drawSubjectPanel(ctx, results);
+
+  // Vertical divider
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.beginPath(); ctx.moveTo(530, PANEL_Y + 10); ctx.lineTo(530, PANEL_Y + PANEL_H - 10); ctx.stroke();
+
+  // ===== FACIAL SCAN PANEL (center, 530-780px) =====
+  drawFaceCropPanel(ctx, results.faceResults, sourceImage);
+
+  // Vertical divider
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.beginPath(); ctx.moveTo(785, PANEL_Y + 10); ctx.lineTo(785, PANEL_Y + PANEL_H - 10); ctx.stroke();
+
+  // ===== SIGNAL PANEL (right, 790-1080px) =====
+  drawSignalPanel(ctx);
+}
+
+function drawSubjectPanel(ctx, results) {
+  const x = MARGIN;
+  let y = PANEL_Y + 28;
+
+  // Panel header
+  ctx.font = '11px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.fillText('━ SUBJECT ALPHA', x, y);
+  y += 8;
+
+  // Border box
+  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x, y, 480, 280);
+
+  y += 20;
+  const persons = results.objectResults.detections.filter(d => d.categories[0].categoryName === 'person');
+  const hasPerson = persons.length > 0;
+  const conf = hasPerson ? Math.round(persons[0].categories[0].score * 100) : randInt(60, 95);
+
+  const fields = [
+    ['ID', `DSK-${randInt(1000, 9999)}`],
+    ['STATUS', 'ACTIVE'],
+    ['CLASS', hasPerson ? 'CIVILIAN' : 'UNKNOWN'],
+    ['THREAT', ['LOW', 'LOW', 'LOW', 'MODERATE'][randInt(0, 3)]],
+    ['CONFIDENCE', `${conf}%`],
+    ['BEARING', `${randInt(0, 359)}°`],
+    ['HEIGHT EST', `${randInt(155, 185)}CM`],
+    ['RANGE', `${randFloat(1.0, 8.0, 1)}M`],
+  ];
+
+  ctx.font = '11px "Share Tech Mono", monospace';
+  for (let i = 0; i < fields.length; i++) {
+    const col = i < 4 ? 0 : 1;
+    const row = i % 4;
+    const fx = x + 14 + col * 240;
+    const fy = y + row * 26;
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.fillText(fields[i][0] + ':', fx, fy);
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.fillText(fields[i][1], fx + 120, fy);
+  }
+
+  // Biometric progress bar
+  const barY = y + 120;
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.font = '9px "Share Tech Mono", monospace';
+  ctx.fillText('BIOMETRIC SCAN', x + 14, barY);
+
+  // Bar background
+  ctx.fillStyle = 'rgba(255,255,255,0.06)';
+  ctx.fillRect(x + 14, barY + 8, 200, 8);
+  // Bar fill
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  ctx.fillRect(x + 14, barY + 8, 200 * (conf / 100), 8);
+  // Percentage
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.fillText(`${conf}%`, x + 220, barY + 16);
+
+  // Additional data
+  const extraY = barY + 40;
+  ctx.font = '9px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  ctx.fillText(`GAIT: NORMAL    HR: ${randInt(62, 78)} BPM    RESP: OK`, x + 14, extraY);
+  ctx.fillText(`THERMAL: ${randFloat(36.2, 37.1, 1)}°C    EMR: BASELINE`, x + 14, extraY + 18);
+  ctx.fillText(`SIGNATURE: ${randHex(8)}-${randHex(4)}`, x + 14, extraY + 36);
+}
+
+function drawFaceCropPanel(ctx, faceResults, sourceImage) {
+  const panelX = 545;
+  let y = PANEL_Y + 28;
+
+  ctx.font = '11px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.fillText('━ FACIAL SCAN', panelX, y);
+  y += 12;
+
+  const cropSize = 140;
+
+  if (faceResults.detections.length > 0) {
+    const face = faceResults.detections[0];
+    const box = face.boundingBox;
+
+    // Expand crop area slightly
+    const pad = Math.max(box.width, box.height) * 0.3;
+    const sx = Math.max(0, box.originX - pad);
+    const sy = Math.max(0, box.originY - pad);
+    const sw = Math.min(sourceImage.width - sx, box.width + pad * 2);
+    const sh = Math.min(sourceImage.height - sy, box.height + pad * 2);
+
+    // Draw face crop (grayscale via filter)
+    ctx.save();
+    ctx.filter = 'grayscale(1) contrast(1.2)';
+    ctx.beginPath();
+    ctx.rect(panelX, y, cropSize, cropSize);
+    ctx.clip();
+    const fScale = cropSize / Math.max(sw, sh);
+    ctx.drawImage(sourceImage, sx, sy, sw, sh,
+      panelX, y, sw * fScale, sh * fScale);
+    ctx.restore();
+
+    // Grid overlay on face
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i <= 6; i++) {
+      const lx = panelX + (cropSize / 6) * i;
+      const ly = y + (cropSize / 6) * i;
+      ctx.beginPath(); ctx.moveTo(lx, y); ctx.lineTo(lx, y + cropSize); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(panelX, ly); ctx.lineTo(panelX + cropSize, ly); ctx.stroke();
+    }
+
+    // Border
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(panelX, y, cropSize, cropSize);
+  } else {
+    // No face — placeholder
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(panelX, y, cropSize, cropSize);
+    ctx.font = '9px "Share Tech Mono", monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    ctx.textAlign = 'center';
+    ctx.fillText('NO FACE', panelX + cropSize / 2, y + cropSize / 2);
+    ctx.fillText('DETECTED', panelX + cropSize / 2, y + cropSize / 2 + 14);
+    ctx.textAlign = 'left';
+  }
+
+  // Analysis bars below face
+  const barY = y + cropSize + 16;
+  const barLabels = [
+    ['MATCH', 'NO RECORD'],
+    ['AGE EST', `${randInt(20, 45)}`],
+    ['DB SRCH', `${randInt(40, 92)}%`],
+  ];
+
+  ctx.font = '9px "Share Tech Mono", monospace';
+  for (let i = 0; i < barLabels.length; i++) {
+    const by = barY + i * 24;
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.fillText(barLabels[i][0], panelX, by);
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.fillText(barLabels[i][1], panelX + 80, by);
+  }
+
+  // Progress bars
+  const pbY = barY + 80;
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.fillText('RECOGNITION:', panelX, pbY);
+  ctx.fillStyle = 'rgba(255,255,255,0.06)';
+  ctx.fillRect(panelX, pbY + 8, 140, 6);
+  const pct = faceResults.detections.length > 0 ? 0.3 + Math.random() * 0.5 : 0;
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.fillRect(panelX, pbY + 8, 140 * pct, 6);
+
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.fillText('SCANNING...', panelX, pbY + 30);
+}
+
+function drawSignalPanel(ctx) {
+  const x = 800;
+  let y = PANEL_Y + 28;
+
+  ctx.font = '11px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.fillText('━ SIGNAL', x, y);
+  y += 20;
+
+  // Waveform
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let i = 0; i < 240; i++) {
+    const wx = x + i;
+    const wy = y + 30 + Math.sin(i * 0.06) * 18 + Math.sin(i * 0.15) * 8 + (Math.random() - 0.5) * 6;
+    if (i === 0) ctx.moveTo(wx, wy); else ctx.lineTo(wx, wy);
+  }
+  ctx.stroke();
+
+  // Waveform baseline
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.beginPath(); ctx.moveTo(x, y + 30); ctx.lineTo(x + 240, y + 30); ctx.stroke();
+
+  // Frequency spectrum bars
+  const specY = y + 80;
+  ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  ctx.font = '9px "Share Tech Mono", monospace';
+  ctx.fillText('SPECTRUM:', x, specY);
+
+  for (let i = 0; i < 30; i++) {
+    const barH = Math.random() * 40 + 5;
+    const alpha = 0.15 + Math.random() * 0.3;
+    ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+    ctx.fillRect(x + i * 8, specY + 50 - barH, 5, barH);
+  }
+
+  // Signal data
+  const dataY = specY + 70;
+  const sigData = [
+    ['FREQ', '2.4GHZ'],
+    ['PWR', `-${randInt(30, 60)}DBM`],
+    ['ENCRYPT', 'AES-256'],
+    ['CHANNEL', `CH-${randInt(1, 48)}`],
+    ['LATENCY', `${randInt(2, 18)}MS`],
+    ['PROTOCOL', 'TLS 1.3'],
+  ];
+  ctx.font = '9px "Share Tech Mono", monospace';
+  for (let i = 0; i < sigData.length; i++) {
+    const dy = dataY + i * 18;
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.fillText(sigData[i][0] + ':', x, dy);
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.fillText(sigData[i][1], x + 80, dy);
+  }
+}
+
+function drawBottomDataStrip(ctx, results, procTime) {
+  // Background
+  ctx.fillStyle = 'rgba(0,0,0,0.9)';
+  ctx.fillRect(0, BOTTOM_Y, W, BOTTOM_H);
+
+  // Top line
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, BOTTOM_Y); ctx.lineTo(W, BOTTOM_Y); ctx.stroke();
+
+  const objCount = results.objectResults.detections.length;
+  const faceCount = results.faceResults.detections.length;
+  const personCount = results.objectResults.detections.filter(d => d.categories[0].categoryName === 'person').length;
+  const poseCount = results.poseResults.landmarks.length;
+
+  // Stats row
+  let y = BOTTOM_Y + 30;
+  ctx.font = '11px "Share Tech Mono", monospace';
+  const stats = [
+    { label: 'OBJECTS:', value: `${objCount}`, x: MARGIN },
+    { label: 'PERSONS:', value: `${personCount}`, x: 200 },
+    { label: 'FACES:', value: `${faceCount}`, x: 370 },
+    { label: 'POSES:', value: `${poseCount}`, x: 520 },
+    { label: 'PROC:', value: `${procTime}MS`, x: 670 },
+    { label: 'LAT:', value: `${randFloat(35.6, 35.7, 3)}`, x: 860 },
+  ];
+  for (const s of stats) {
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.fillText(s.label, s.x, y);
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.fillText(s.value, s.x + ctx.measureText(s.label).width + 6, y);
+  }
+
+  // Barcode
+  y = BOTTOM_Y + 55;
+  drawBarcode(ctx, MARGIN, y, 220, 40);
+
+  // Serial number below barcode
+  ctx.font = '9px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  const now = new Date();
+  const serial = `DSK-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${String(randInt(1, 999)).padStart(3, '0')}`;
+  ctx.fillText(serial, MARGIN, y + 52);
+
+  // System info block
+  const sysX = 320;
+  const sysY = BOTTOM_Y + 55;
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(sysX, sysY, 440, 120);
+
+  ctx.font = '10px "Share Tech Mono", monospace';
+  const sysLines = [
+    { label: 'CLASSIFICATION:', value: 'UNCLASSIFIED', color: 'rgba(255,255,255,0.7)' },
+    { label: 'SYSTEM:', value: 'DARK SCANNER RECON v3.1.0', color: 'rgba(255,255,255,0.5)' },
+    { label: 'MODEL:', value: 'EFFICIENTDET / BLAZEFACE / POSE-LITE', color: 'rgba(255,255,255,0.5)' },
+    { label: 'OPERATOR:', value: '[REDACTED]', color: 'rgba(255,255,255,0.3)' },
+    { label: 'AUTH:', value: `${randHex(8)}-${randHex(4)}-${randHex(4)}`, color: 'rgba(255,255,255,0.3)' },
+  ];
+
+  for (let i = 0; i < sysLines.length; i++) {
+    const ly = sysY + 18 + i * 20;
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.fillText(sysLines[i].label, sysX + 12, ly);
+    ctx.fillStyle = sysLines[i].color;
+    ctx.fillText(sysLines[i].value, sysX + 150, ly);
+  }
+
+  // QR-like block (bottom right)
+  drawFakeQR(ctx, W - MARGIN - 120, BOTTOM_Y + 60, 100, 100);
+
+  // Footer
+  ctx.font = '9px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.12)';
+  ctx.textAlign = 'center';
+  ctx.fillText('DARK SCANNER // TACTICAL IMAGE ANALYSIS // AUTHORIZED PERSONNEL ONLY', W / 2, H - 15);
+  ctx.textAlign = 'left';
+
+  // Copyright
+  ctx.textAlign = 'right';
+  ctx.fillText('© DSK SYSTEMS', W - MARGIN, H - 15);
+  ctx.textAlign = 'left';
+}
+
+function drawBarcode(ctx, x, y, w, h) {
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  let cx = x;
+  while (cx < x + w) {
+    const barW = Math.random() > 0.5 ? 1 : 3;
+    const gap = Math.random() > 0.5 ? 2 : 3;
+    ctx.fillRect(cx, y, barW, h);
+    cx += barW + gap;
+  }
+}
+
+function drawFakeQR(ctx, x, y, w, h) {
+  const cell = 5;
+  const cols = Math.floor(w / cell);
+  const rows = Math.floor(h / cell);
+
+  // Corner markers
+  for (const [cx, cy] of [[0,0], [cols-5, 0], [0, rows-5]]) {
+    for (let r = 0; r < 5; r++) {
+      for (let c = 0; c < 5; c++) {
+        const isEdge = r === 0 || r === 4 || c === 0 || c === 4;
+        const isCenter = r === 2 && c === 2;
+        if (isEdge || isCenter) {
+          ctx.fillStyle = 'rgba(255,255,255,0.4)';
+          ctx.fillRect(x + (cx+c) * cell, y + (cy+r) * cell, cell - 1, cell - 1);
+        }
+      }
+    }
+  }
+
+  // Random data
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (c < 5 && r < 5) continue;
+      if (c >= cols-5 && r < 5) continue;
+      if (c < 5 && r >= rows-5) continue;
+      if (Math.random() > 0.55) {
+        ctx.fillStyle = `rgba(255,255,255,${0.15 + Math.random() * 0.2})`;
+        ctx.fillRect(x + c * cell, y + r * cell, cell - 1, cell - 1);
+      }
+    }
+  }
+}
+
+function drawScanlines(ctx) {
+  ctx.fillStyle = 'rgba(0,0,0,0.03)';
+  for (let y = 0; y < H; y += 4) {
+    ctx.fillRect(0, y, W, 2);
+  }
+}
+
+function drawFullCornerMarks(ctx) {
+  drawCornerBrackets(ctx, 4, 4, W - 8, H - 8, 40, 2, 'rgba(255,255,255,0.25)');
+}
+
+/* ===== MASTER RENDER ===== */
+async function renderHUD(sourceImage, results) {
+  // Wait for font
+  await document.fonts.ready;
+
+  const ctx = hudCtx;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'alphabetic';
+
+  // Layer 1: Background
+  drawBackground(ctx);
+
+  // Layer 2: Main image
+  drawMainImage(ctx, sourceImage);
+
+  // Layer 3: Detection overlays
+  drawObjectBrackets(ctx, results.objectResults, sourceImage);
+  drawPoseSkeleton(ctx, results.poseResults, sourceImage);
+  drawFaceTargeting(ctx, results.faceResults, sourceImage);
+  drawConnectionLines(ctx, results, sourceImage);
+
+  // Layer 4: HUD chrome
+  drawHeader(ctx);
+  drawTopDataStrip(ctx);
+  drawAnalysisPanel(ctx, results, sourceImage);
+  drawBottomDataStrip(ctx, results, results.procTime);
+
+  // Layer 5: Finishing
+  drawFullCornerMarks(ctx);
+  drawScanlines(ctx);
+}
+
+/* ===== PNG SAVE ===== */
+function savePNG() {
+  hudCanvas.toBlob(async (blob) => {
+    const filename = `dark-scanner-${Date.now()}.png`;
+    // Try Web Share API for mobile
+    if (navigator.share && navigator.canShare) {
+      const file = new File([blob], filename, { type: 'image/png' });
+      const shareData = { files: [file] };
+      if (navigator.canShare(shareData)) {
+        try {
+          await navigator.share(shareData);
+          return;
+        } catch (e) {
+          // User cancelled or share failed, fall through to download
+        }
+      }
+    }
+    // Fallback: download
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, 'image/png');
+}
+
+/* ===== EVENT HANDLERS ===== */
+btnCamera.addEventListener('click', async () => {
+  showScreen('camera-screen');
+  await startCamera();
+});
+
+btnUpload.addEventListener('click', () => {
+  fileInput.click();
+});
+
+btnGallery.addEventListener('click', () => {
+  fileInput.click();
+});
+
+fileInput.addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  stopCamera();
+
+  const img = new Image();
+  img.onload = async () => {
+    const results = await analyzeImage(img);
+    await renderHUD(img, results);
+    showScreen('result-screen');
+    URL.revokeObjectURL(img.src);
+  };
+  img.src = URL.createObjectURL(file);
+  e.target.value = '';
+});
+
+btnScan.addEventListener('click', async () => {
+  const capturedCanvas = captureFrame();
+  stopCamera();
+
+  // Convert canvas to image for MediaPipe
+  const img = new Image();
+  img.onload = async () => {
+    const results = await analyzeImage(img);
+    await renderHUD(img, results);
+    showScreen('result-screen');
+  };
+  img.src = capturedCanvas.toDataURL();
+});
+
+btnFlip.addEventListener('click', async () => {
+  currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+  await startCamera();
+});
+
+btnBackStart.addEventListener('click', () => {
+  stopCamera();
+  showScreen('start-screen');
+});
+
+btnSave.addEventListener('click', savePNG);
+
+btnNew.addEventListener('click', () => {
+  showScreen('start-screen');
+});
+
+/* ===== INIT ===== */
+initModels();
+</script>
+</body>
+</html>
