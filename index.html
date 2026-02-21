@@ -301,7 +301,7 @@ const hudCtx = hudCanvas.getContext('2d');
 /* ===== CONSTANTS ===== */
 const W = 1080;
 const H = 1920;
-const M = 30; // margin
+const M = 30;
 
 /* ===== POSE CONNECTIONS ===== */
 const POSE_CONNECTIONS = [
@@ -447,49 +447,32 @@ function formatTimestamp() {
   return { date: `${y}.${m}.${d}`, time: `${hh}:${mm}:${ss} JST` };
 }
 
-/* ===== HUD DRAWING — FULL OVERLAY DESIGN ===== */
-/* 写真を全面に配置し、その上にフローティングウィンドウを散在させる */
+/* =========================================================
+   HUD DRAWING — V5: PHOTO-DOMINANT OVERLAY
+   - Photo fills nearly the entire canvas (edge-to-edge)
+   - ALL elements overlay ON TOP of the photo
+   - Extreme text size contrast (140px ↔ 8px)
+   - Clean data panels with semi-transparent backgrounds
+   - Monochrome, high contrast
+   ========================================================= */
 
-function imgCoords(sourceImage) {
-  const sW = sourceImage.width, sH = sourceImage.height;
-  const scale = Math.max(W / sW, H / sH);
-  return {
-    scale,
-    dW: sW * scale, dH: sH * scale,
-    ox: (W - sW * scale) / 2, oy: (H - sH * scale) / 2
-  };
+function calcAngle(a, b, c) {
+  const ab = { x: a.x - b.x, y: a.y - b.y };
+  const cb = { x: c.x - b.x, y: c.y - b.y };
+  const dot = ab.x * cb.x + ab.y * cb.y;
+  const mA = Math.sqrt(ab.x*ab.x + ab.y*ab.y);
+  const mC = Math.sqrt(cb.x*cb.x + cb.y*cb.y);
+  if (mA === 0 || mC === 0) return 0;
+  return Math.round(Math.acos(Math.max(-1, Math.min(1, dot/(mA*mC)))) * 180 / Math.PI);
 }
 
+/* --- Helpers --- */
 function drawCornerBrackets(ctx, x, y, w, h, len, lw, color) {
   ctx.strokeStyle = color; ctx.lineWidth = lw;
   ctx.beginPath(); ctx.moveTo(x, y+len); ctx.lineTo(x, y); ctx.lineTo(x+len, y); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(x+w-len, y); ctx.lineTo(x+w, y); ctx.lineTo(x+w, y+len); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(x, y+h-len); ctx.lineTo(x, y+h); ctx.lineTo(x+len, y+h); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(x+w-len, y+h); ctx.lineTo(x+w, y+h); ctx.lineTo(x+w, y+h-len); ctx.stroke();
-}
-
-/* --- Panel helper: draws a floating window with title bar --- */
-function drawPanel(ctx, x, y, w, h, title) {
-  // Background
-  ctx.fillStyle = 'rgba(0,0,0,0.72)';
-  ctx.fillRect(x, y, w, h);
-  // Border
-  ctx.strokeStyle = 'rgba(255,255,255,0.18)';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(x, y, w, h);
-  // Title bar
-  ctx.fillStyle = 'rgba(255,255,255,0.06)';
-  ctx.fillRect(x, y, w, 22);
-  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-  ctx.beginPath(); ctx.moveTo(x, y+22); ctx.lineTo(x+w, y+22); ctx.stroke();
-  // Title text
-  ctx.font = '9px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.5)';
-  ctx.textAlign = 'left';
-  ctx.fillText(title, x + 8, y + 15);
-  // Close dot
-  ctx.fillStyle = 'rgba(255,255,255,0.2)';
-  ctx.beginPath(); ctx.arc(x + w - 10, y + 11, 3, 0, Math.PI*2); ctx.fill();
 }
 
 function drawBarcode(ctx, x, y, w, h) {
@@ -503,92 +486,104 @@ function drawBarcode(ctx, x, y, w, h) {
   }
 }
 
-function calcAngle(a, b, c) {
-  const ab = { x: a.x - b.x, y: a.y - b.y };
-  const cb = { x: c.x - b.x, y: c.y - b.y };
-  const dot = ab.x * cb.x + ab.y * cb.y;
-  const mA = Math.sqrt(ab.x*ab.x + ab.y*ab.y);
-  const mC = Math.sqrt(cb.x*cb.x + cb.y*cb.y);
-  if (mA === 0 || mC === 0) return 0;
-  return Math.round(Math.acos(Math.max(-1, Math.min(1, dot/(mA*mC)))) * 180 / Math.PI);
+function drawQRBlock(ctx, qx, qy, cellSize, cols, rows) {
+  for (const [cx,cy] of [[0,0],[cols-5,0],[0,rows-5]]) {
+    for (let r=0;r<5;r++) for (let c=0;c<5;c++) {
+      if (r===0||r===4||c===0||c===4||(r>=1&&r<=3&&c>=1&&c<=3)) {
+        ctx.fillStyle = 'rgba(255,255,255,0.55)';
+        ctx.fillRect(qx+(cx+c)*cellSize, qy+(cy+r)*cellSize, cellSize-1, cellSize-1);
+      }
+    }
+  }
+  for (let r=0;r<rows;r++) for (let c=0;c<cols;c++) {
+    if (c<5&&r<5) continue; if (c>=cols-5&&r<5) continue; if (c<5&&r>=rows-5) continue;
+    if (Math.random()>0.5) {
+      ctx.fillStyle = `rgba(255,255,255,${0.1+Math.random()*0.25})`;
+      ctx.fillRect(qx+c*cellSize, qy+r*cellSize, cellSize-1, cellSize-1);
+    }
+  }
 }
 
-/* ===== LAYER 1: Full-bleed photo with thermal/dark processing ===== */
-function drawFullImage(ctx, src) {
-  const { ox, oy, dW, dH } = imgCoords(src);
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, W, H);
+/* Draw a clean data panel with semi-transparent BG */
+function drawPanel(ctx, x, y, w, h, opts = {}) {
+  ctx.fillStyle = opts.bg || 'rgba(0,0,0,0.65)';
+  ctx.fillRect(x, y, w, h);
+  if (opts.border !== false) {
+    ctx.strokeStyle = opts.borderColor || 'rgba(255,255,255,0.1)';
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(x, y, w, h);
+  }
+}
 
-  // Draw original image first
+/* ===== PHOTO — nearly full canvas ===== */
+const PHOTO_X = 0;
+const PHOTO_Y = 0;
+const PHOTO_W = W;    // 1080
+const PHOTO_H = H;    // 1920
+
+/* ===== LAYER 1: Photo fills entire canvas (monochrome) ===== */
+function drawPhoto(ctx, src) {
+  const sW = src.width, sH = src.height;
+  const scale = Math.max(PHOTO_W / sW, PHOTO_H / sH);
+  const dW = sW * scale, dH = sH * scale;
+  const ox = (PHOTO_W - dW) / 2;
+  const oy = (PHOTO_H - dH) / 2;
+
   ctx.drawImage(src, ox, oy, dW, dH);
 
-  // Apply thermal/dark processing via pixel manipulation
+  // Monochrome + high contrast
   const imageData = ctx.getImageData(0, 0, W, H);
   const d = imageData.data;
   for (let i = 0; i < d.length; i += 4) {
-    const r = d[i], g = d[i+1], b = d[i+2];
-    // Luminance
-    const lum = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
-
-    // Thermal color mapping: black → deep purple → blue → cyan → yellow → orange → white
-    let tr, tg, tb;
-    if (lum < 0.12) {
-      // Black → very dark purple
-      const t = lum / 0.12;
-      tr = t * 25; tg = 0; tb = t * 40;
-    } else if (lum < 0.28) {
-      // Dark purple → deep blue
-      const t = (lum - 0.12) / 0.16;
-      tr = 25 - t * 15; tg = t * 10; tb = 40 + t * 80;
-    } else if (lum < 0.42) {
-      // Blue → cyan
-      const t = (lum - 0.28) / 0.14;
-      tr = 10 + t * 10; tg = 10 + t * 130; tb = 120 + t * 40;
-    } else if (lum < 0.55) {
-      // Cyan → green-yellow
-      const t = (lum - 0.42) / 0.13;
-      tr = 20 + t * 180; tg = 140 + t * 60; tb = 160 - t * 140;
-    } else if (lum < 0.7) {
-      // Yellow → orange
-      const t = (lum - 0.55) / 0.15;
-      tr = 200 + t * 50; tg = 200 - t * 80; tb = 20 - t * 15;
-    } else if (lum < 0.85) {
-      // Orange → hot red-orange
-      const t = (lum - 0.7) / 0.15;
-      tr = 250; tg = 120 - t * 60; tb = 5 + t * 15;
-    } else {
-      // Hot → near white with warm tint
-      const t = (lum - 0.85) / 0.15;
-      tr = 250 + t * 5; tg = 60 + t * 160; tb = 20 + t * 180;
-    }
-
-    // Pure thermal — no mixing with original
-    d[i]   = Math.min(255, tr);
-    d[i+1] = Math.min(255, tg);
-    d[i+2] = Math.min(255, tb);
+    let lum = (d[i] * 0.299 + d[i+1] * 0.587 + d[i+2] * 0.114);
+    lum = lum < 80 ? lum * 0.4 : Math.min(255, lum * 1.2 + 10);
+    d[i] = d[i+1] = d[i+2] = lum;
   }
   ctx.putImageData(imageData, 0, 0);
 
-  // Darken overall + contrast boost
-  ctx.fillStyle = 'rgba(0,0,0,0.2)';
-  ctx.fillRect(0, 0, W, H);
+  // Top gradient fade (for header readability)
+  const gTop = ctx.createLinearGradient(0, 0, 0, 320);
+  gTop.addColorStop(0, 'rgba(0,0,0,0.7)');
+  gTop.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = gTop; ctx.fillRect(0, 0, W, 320);
 
-  // Vignette
-  const g = ctx.createRadialGradient(W/2, H/2, H*0.18, W/2, H/2, H*0.7);
-  g.addColorStop(0, 'rgba(0,0,0,0)');
-  g.addColorStop(1, 'rgba(0,0,0,0.6)');
-  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  // Bottom gradient fade (for footer readability)
+  const gBot = ctx.createLinearGradient(0, H - 500, 0, H);
+  gBot.addColorStop(0, 'rgba(0,0,0,0)');
+  gBot.addColorStop(1, 'rgba(0,0,0,0.8)');
+  ctx.fillStyle = gBot; ctx.fillRect(0, H - 500, W, 500);
 
-  // Subtle grid
-  ctx.strokeStyle = 'rgba(255,255,255,0.025)'; ctx.lineWidth = 1;
-  for (let x = 0; x < W; x += 90) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
-  for (let y = 0; y < H; y += 90) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+  // Subtle vignette
+  const gVig = ctx.createRadialGradient(W/2, H*0.4, W*0.2, W/2, H*0.4, W*0.8);
+  gVig.addColorStop(0, 'rgba(0,0,0,0)');
+  gVig.addColorStop(1, 'rgba(0,0,0,0.35)');
+  ctx.fillStyle = gVig; ctx.fillRect(0, 0, W, H);
 }
 
-/* ===== LAYER 2: Detection overlays on photo ===== */
+/* ===== LAYER 2: X-cross + grid lines (over photo) ===== */
+function drawCrossLines(ctx) {
+  // Diagonal X
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(W, H); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(W, 0); ctx.lineTo(0, H); ctx.stroke();
+
+  // Center cross
+  ctx.strokeStyle = 'rgba(255,255,255,0.035)';
+  ctx.beginPath(); ctx.moveTo(0, H/2); ctx.lineTo(W, H/2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(W/2, 0); ctx.lineTo(W/2, H); ctx.stroke();
+
+  // Subtle grid
+  ctx.strokeStyle = 'rgba(255,255,255,0.02)'; ctx.lineWidth = 0.5;
+  for (let x = 0; x < W; x += 60) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  for (let y = 0; y < H; y += 60) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+}
+
+/* ===== LAYER 3: Detection overlays (on full photo) ===== */
 function drawDetections(ctx, results, src) {
-  const { scale, ox, oy } = imgCoords(src);
   const sW = src.width, sH = src.height;
+  const scale = Math.max(W / sW, H / sH);
+  const baseOX = (W - sW * scale) / 2;
+  const baseOY = (H - sH * scale) / 2;
 
   // --- Object brackets ---
   const subjNames = ['ALPHA','BRAVO','CHARLIE','DELTA','ECHO'];
@@ -598,40 +593,30 @@ function drawDetections(ctx, results, src) {
     const cat = det.categories[0];
     const label = cat.categoryName.toUpperCase();
     const score = Math.round(cat.score * 100);
-    const bx = b.originX * scale + ox;
-    const by = b.originY * scale + oy;
+    const bx = b.originX * scale + baseOX;
+    const by = b.originY * scale + baseOY;
     const bw = b.width * scale;
     const bh = b.height * scale;
-    const bl = Math.min(bw, bh) * 0.2;
-    ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 1.5;
-    // TL
+    const bl = Math.min(bw, bh) * 0.12;
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.moveTo(bx, by+bl); ctx.lineTo(bx, by); ctx.lineTo(bx+bl, by); ctx.stroke();
-    // TR
     ctx.beginPath(); ctx.moveTo(bx+bw-bl, by); ctx.lineTo(bx+bw, by); ctx.lineTo(bx+bw, by+bl); ctx.stroke();
-    // BL
     ctx.beginPath(); ctx.moveTo(bx, by+bh-bl); ctx.lineTo(bx, by+bh); ctx.lineTo(bx+bl, by+bh); ctx.stroke();
-    // BR
     ctx.beginPath(); ctx.moveTo(bx+bw-bl, by+bh); ctx.lineTo(bx+bw, by+bh); ctx.lineTo(bx+bw, by+bh-bl); ctx.stroke();
-    // Crosshair
-    const ccx = bx+bw/2, ccy = by+bh/2, cr = Math.min(bw,bh)*0.06;
-    ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(ccx, ccy, cr, 0, Math.PI*2); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(ccx-cr*2,ccy); ctx.lineTo(ccx+cr*2,ccy); ctx.moveTo(ccx,ccy-cr*2); ctx.lineTo(ccx,ccy+cr*2); ctx.stroke();
-    // Label
     const isPerson = label === 'PERSON';
     const dLabel = isPerson ? `SUBJ-${subjNames[pIdx]||pIdx}` : label;
     if (isPerson) pIdx++;
-    ctx.font = '11px "Share Tech Mono", monospace';
-    ctx.fillStyle = 'rgba(255,255,255,0.7)';
-    ctx.textAlign = 'left'; ctx.fillText(dLabel, bx+4, by-8);
-    ctx.textAlign = 'right'; ctx.fillText(`${score}%`, bx+bw-4, by-8);
+    ctx.font = '700 12px "Share Tech Mono", monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.textAlign = 'left'; ctx.fillText(dLabel, bx+4, by-6);
+    ctx.textAlign = 'right'; ctx.fillText(`${score}%`, bx+bw-4, by-6);
     ctx.textAlign = 'left';
   }
 
   // --- Pose skeleton ---
   for (const lm of results.poseResults.landmarks) {
-    const pts = lm.map(p => ({ x: p.x*sW*scale+ox, y: p.y*sH*scale+oy, v: p.visibility }));
-    ctx.strokeStyle = 'rgba(255,255,255,0.22)'; ctx.lineWidth = 1;
+    const pts = lm.map(p => ({ x: p.x*sW*scale+baseOX, y: p.y*sH*scale+baseOY, v: p.visibility }));
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 1;
     for (const [a,b] of POSE_CONNECTIONS) {
       if (a>=pts.length||b>=pts.length) continue;
       if (pts[a].v<0.4||pts[b].v<0.4) continue;
@@ -639,315 +624,377 @@ function drawDetections(ctx, results, src) {
     }
     for (const p of pts) {
       if (p.v<0.4) continue;
-      ctx.fillStyle = 'rgba(255,255,255,0.45)';
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
       ctx.beginPath(); ctx.arc(p.x, p.y, 2.5, 0, Math.PI*2); ctx.fill();
-    }
-    // Angles
-    for (const aj of [{j:14,f:12,t:16},{j:25,f:23,t:27},{j:12,f:11,t:14}]) {
-      if (aj.j>=pts.length||aj.f>=pts.length||aj.t>=pts.length) continue;
-      if (pts[aj.j].v<0.4||pts[aj.f].v<0.4||pts[aj.t].v<0.4) continue;
-      ctx.font = '9px "Share Tech Mono", monospace'; ctx.fillStyle = 'rgba(255,255,255,0.35)';
-      ctx.fillText(`${calcAngle(pts[aj.f],pts[aj.j],pts[aj.t])}°`, pts[aj.j].x+6, pts[aj.j].y-6);
     }
   }
 
   // --- Face targeting ---
   for (const det of results.faceResults.detections) {
     const b = det.boundingBox;
-    const fcx = b.originX*scale+ox + b.width*scale/2;
-    const fcy = b.originY*scale+oy + b.height*scale/2;
-    const r = Math.max(b.width,b.height)*scale*0.55;
-    ctx.setLineDash([8,5]); ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1.5;
+    const fcx = b.originX*scale+baseOX + b.width*scale/2;
+    const fcy = b.originY*scale+baseOY + b.height*scale/2;
+    const r = Math.max(b.width,b.height)*scale*0.5;
+    ctx.setLineDash([8,5]); ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(fcx,fcy,r,0,Math.PI*2); ctx.stroke();
-    ctx.setLineDash([]); ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(fcx,fcy,r*0.72,0,Math.PI*2); ctx.stroke();
-    // Ticks
-    ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 2;
+    ctx.setLineDash([]);
+    ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 2;
     for (let i=0;i<4;i++) {
       const a = i*Math.PI/2;
       ctx.beginPath();
-      ctx.moveTo(fcx+Math.cos(a)*(r-7), fcy+Math.sin(a)*(r-7));
-      ctx.lineTo(fcx+Math.cos(a)*(r+7), fcy+Math.sin(a)*(r+7));
+      ctx.moveTo(fcx+Math.cos(a)*(r-6), fcy+Math.sin(a)*(r-6));
+      ctx.lineTo(fcx+Math.cos(a)*(r+6), fcy+Math.sin(a)*(r+6));
       ctx.stroke();
     }
-    // Small cross
-    ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1;
-    const cl = r*0.2;
-    ctx.beginPath(); ctx.moveTo(fcx-cl,fcy); ctx.lineTo(fcx+cl,fcy); ctx.moveTo(fcx,fcy-cl); ctx.lineTo(fcx,fcy+cl); ctx.stroke();
   }
 }
 
-/* ===== LAYER 3: Floating HUD windows ===== */
-
-function drawHeaderBar(ctx) {
-  ctx.fillStyle = 'rgba(0,0,0,0.6)';
-  ctx.fillRect(0, 0, W, 52);
-  ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(0,52); ctx.lineTo(W,52); ctx.stroke();
-
-  const ts = formatTimestamp();
-  ctx.font = '700 13px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.textAlign = 'left';
-  ctx.fillText('DARK SCANNER', M, 32);
-  ctx.font = '10px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.35)';
-  ctx.fillText('CAM-01', 230, 32);
-  // REC dot
-  ctx.fillStyle = '#ff3333';
-  ctx.beginPath(); ctx.arc(310, 28, 3.5, 0, Math.PI*2); ctx.fill();
-  ctx.font = '10px "Share Tech Mono", monospace';
-  ctx.fillStyle = '#ff3333'; ctx.fillText('REC', 318, 32);
-  // Right: date/time
+/* ===== LAYER 4: GIANT typography (overlaid on photo) ===== */
+function drawGiantText(ctx) {
+  // "SCAN.XX" — massive, top-right, overlapping photo
+  ctx.font = '700 140px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.12)';
   ctx.textAlign = 'right';
-  ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.font = '10px "Share Tech Mono", monospace';
-  ctx.fillText(`${ts.date}  ${ts.time}`, W - M, 32);
+  ctx.fillText(`SCAN`, W - 20, 180);
+  ctx.font = '700 80px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.25)';
+  ctx.fillText(`.${String(randInt(1,12)).padStart(2,'0')}`, W - 20, 250);
   ctx.textAlign = 'left';
+
+  // "DARK SCANNER" — huge watermark, center-left, over the body
+  ctx.save();
+  ctx.translate(80, H * 0.55);
+  ctx.rotate(-Math.PI / 2);
+  ctx.font = '700 110px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.04)';
+  ctx.textAlign = 'center';
+  ctx.fillText('DARK SCANNER', 0, 0);
+  ctx.restore();
+
+  // Japanese accent — 暗号走査 — bottom area
+  ctx.font = '700 72px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.07)';
+  ctx.textAlign = 'left';
+  ctx.fillText('暗号走査', 30, H - 460);
 }
 
-function drawFooterBar(ctx, results, procTime) {
-  ctx.fillStyle = 'rgba(0,0,0,0.6)';
-  ctx.fillRect(0, H-48, W, 48);
-  ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(0,H-48); ctx.lineTo(W,H-48); ctx.stroke();
+/* ===== LAYER 5: Top header panel (over photo) ===== */
+function drawHeaderPanel(ctx) {
+  drawPanel(ctx, 0, 0, W, 52);
+  const ts = formatTimestamp();
+  ctx.font = '700 18px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.textAlign = 'left';
+  ctx.fillText('DARK SCANNER', 20, 34);
 
-  const obj = results.objectResults.detections.length;
-  const face = results.faceResults.detections.length;
-  const pose = results.poseResults.landmarks.length;
-  const person = results.objectResults.detections.filter(d=>d.categories[0].categoryName==='person').length;
+  // REC indicator
+  ctx.fillStyle = '#ff3333';
+  ctx.beginPath(); ctx.arc(260, 30, 4, 0, Math.PI*2); ctx.fill();
+  ctx.font = '10px "Share Tech Mono", monospace';
+  ctx.fillStyle = '#ff3333'; ctx.fillText('REC', 270, 34);
 
   ctx.font = '9px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.textAlign = 'left';
-  const items = [`OBJ:${obj}`,`PERS:${person}`,`FACE:${face}`,`POSE:${pose}`,`${procTime}MS`];
-  let ix = M;
-  for (const t of items) {
-    ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillText(t, ix, H-20);
-    ix += ctx.measureText(t).width + 20;
-  }
+  ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  ctx.fillText('CAM-01 // RECON v3.1', 320, 34);
+
   ctx.textAlign = 'right';
-  ctx.fillStyle = 'rgba(255,255,255,0.15)';
-  ctx.fillText('DARK SCANNER RECON v3.1.0 // UNCLASSIFIED', W-M, H-20);
+  ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.font = '11px "Share Tech Mono", monospace';
+  ctx.fillText(`${ts.date}  ${ts.time}`, W - 20, 34);
   ctx.textAlign = 'left';
 }
 
-/* --- WINDOW: Subject Data (top-left overlay) --- */
-function drawWinSubject(ctx, results) {
-  const x = M, y = 70, w = 380, h = 230;
-  drawPanel(ctx, x, y, w, h, 'SUBJECT ALPHA // ANALYSIS');
+/* ===== LAYER 6: Left data panel (over photo, semi-transparent) ===== */
+function drawLeftPanel(ctx, results) {
+  const px = 16, py = 68, pw = 240, ph = 420;
+  drawPanel(ctx, px, py, pw, ph);
 
+  let y = py + 18;
+  const x = px + 14;
+
+  // Section: ORGANIZATION
+  ctx.font = '7px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.fillText('ORGANIZATION  組織', x, y);
+  ctx.font = '11px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.8)';
+  ctx.fillText('DSK.SYSTEMS', x, y + 14);
+  y += 36;
+
+  // Section: COLLECTION
+  ctx.font = '7px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.fillText('COLLECTION  収集', x, y);
+  ctx.font = '11px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.8)';
+  ctx.fillText('RECON-3-SURVEILLANCE', x, y + 14);
+  y += 36;
+
+  // Section: SESSION
+  ctx.font = '7px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.fillText('SESSION  区分', x, y);
+  ctx.font = '11px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.8)';
+  const ts = formatTimestamp();
+  ctx.fillText(ts.date + ' // ' + ts.time, x, y + 14);
+  y += 36;
+
+  // Separator
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + pw - 28, y); ctx.stroke();
+  y += 14;
+
+  // Section: CODENAME with icon
+  ctx.font = '7px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.fillText('CODENAME  識別', x, y);
+  y += 16;
+  // Crosshair icon
+  ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(x+8, y+2, 6, 0, Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x+8, y-4); ctx.lineTo(x+8, y+8); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x+2, y+2); ctx.lineTo(x+14, y+2); ctx.stroke();
+  ctx.font = '700 12px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.8)';
+  ctx.fillText(`DSK-RN${randInt(1,9)}-SC${randInt(10,99)}-BK`, x + 22, y + 6);
+  y += 28;
+
+  // Separator
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + pw - 28, y); ctx.stroke();
+  y += 14;
+
+  // Subject data rows
   const persons = results.objectResults.detections.filter(d=>d.categories[0].categoryName==='person');
-  const hasPerson = persons.length > 0;
-  const conf = hasPerson ? Math.round(persons[0].categories[0].score*100) : randInt(60,95);
-
+  const hasFace = results.faceResults.detections.length > 0;
   const fields = [
-    ['ID', `DSK-${randInt(1000,9999)}`],
     ['STATUS', 'ACTIVE'],
-    ['CLASS', hasPerson ? 'CIVILIAN' : 'UNKNOWN'],
-    ['THREAT', ['LOW','LOW','LOW','MODERATE'][randInt(0,3)]],
-    ['CONFIDENCE', `${conf}%`],
+    ['CLASS', persons.length > 0 ? 'CIVILIAN' : 'UNKNOWN'],
+    ['THREAT', ['LOW','MODERATE','ELEVATED','HIGH'][randInt(0,3)]],
+    ['HR', `${randInt(62,82)} BPM`],
+    ['THERMAL', `${randFloat(36.1,37.2,1)}°C`],
+    ['BIOMETRIC', hasFace ? 'SCANNING' : 'N/A'],
     ['BEARING', `${randInt(0,359)}°`],
-    ['HEIGHT EST', `${randInt(155,185)}CM`],
     ['RANGE', `${randFloat(1.0,8.0,1)}M`],
   ];
-  ctx.font = '10px "Share Tech Mono", monospace';
-  let fy = y + 40;
-  for (let i = 0; i < fields.length; i++) {
-    const col = i < 4 ? 0 : 1;
-    const row = i % 4;
-    const fx = x + 12 + col * 190;
-    const fiy = fy + row * 22;
-    ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillText(fields[i][0]+':', fx, fiy);
-    ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillText(fields[i][1], fx+100, fiy);
+  for (const f of fields) {
+    ctx.font = '7px "Share Tech Mono", monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillText(f[0], x, y);
+    ctx.font = '10px "Share Tech Mono", monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillText(f[1], x + 68, y);
+    y += 17;
   }
-  // Biometric bar
-  const barY = fy + 100;
-  ctx.fillStyle = 'rgba(255,255,255,0.25)'; ctx.font = '8px "Share Tech Mono", monospace';
-  ctx.fillText('BIOMETRIC', x+12, barY);
-  ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(x+12, barY+6, 180, 6);
-  ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillRect(x+12, barY+6, 180*(conf/100), 6);
-  ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.fillText(`${conf}%`, x+198, barY+12);
-  // Extra line
-  ctx.fillStyle = 'rgba(255,255,255,0.2)'; ctx.font = '8px "Share Tech Mono", monospace';
-  ctx.fillText(`GAIT: NORMAL  HR: ${randInt(62,78)} BPM  THERMAL: ${randFloat(36.2,37.1,1)}°C`, x+12, barY+30);
 }
 
-/* --- WINDOW: GPS/Telemetry (top-right) --- */
-function drawWinTelemetry(ctx) {
-  const x = W - M - 340, y = 70, w = 340, h = 130;
-  drawPanel(ctx, x, y, w, h, 'TELEMETRY // ENV DATA');
-  ctx.font = '9px "Share Tech Mono", monospace';
-  const data = [
-    `GPS: ${randFloat(35.65,35.70,4)}°N ${randFloat(139.60,139.80,4)}°E`,
-    `ALT: ${randInt(10,120)}M  ISO: ${[1600,3200,6400][randInt(0,2)]}  F/${['1.8','2.0','2.8'][randInt(0,2)]}`,
-    `TEMP: ${randFloat(18,32,1)}°C  HUM: ${randInt(30,80)}%  WIND: ${randFloat(0,8,1)}M/S`,
-    `LUX: ${randInt(200,2000)}  BAND: ${[450,550,700,850][randInt(0,3)]}NM  WB: ${randInt(3200,6500)}K`,
+/* ===== LAYER 7: Right side panels (over photo) ===== */
+function drawRightPanels(ctx, src, results) {
+  // Sub-image panel 1 (cropped face/upper body)
+  const subX = W - 200, subY = 300, subW = 170, subH = 190;
+  drawPanel(ctx, subX - 4, subY - 16, subW + 8, subH + 20, { bg: 'rgba(0,0,0,0.55)' });
+  ctx.font = '7px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.fillText('■  PROFILE_CLOSE', subX, subY - 4);
+
+  ctx.save();
+  ctx.beginPath(); ctx.rect(subX, subY, subW, subH); ctx.clip();
+  const crScale = Math.max(subW / src.width, subH / (src.height * 0.35));
+  ctx.drawImage(src, 0, 0, src.width, src.height * 0.35, subX, subY, src.width * crScale, src.height * 0.35 * crScale);
+  const sd1 = ctx.getImageData(subX, subY, subW, subH);
+  for (let i = 0; i < sd1.data.length; i += 4) {
+    let l = sd1.data[i]*0.299 + sd1.data[i+1]*0.587 + sd1.data[i+2]*0.114;
+    l = l < 80 ? l * 0.4 : Math.min(255, l * 1.1);
+    sd1.data[i] = sd1.data[i+1] = sd1.data[i+2] = l;
+  }
+  ctx.putImageData(sd1, subX, subY);
+  ctx.restore();
+
+  // Sub-image panel 2 (mid body crop)
+  const sub2Y = subY + subH + 26;
+  drawPanel(ctx, subX - 4, sub2Y - 16, subW + 8, subH + 20, { bg: 'rgba(0,0,0,0.55)' });
+  ctx.font = '7px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.fillText('■  DETAIL_MID', subX, sub2Y - 4);
+
+  ctx.save();
+  ctx.beginPath(); ctx.rect(subX, sub2Y, subW, subH); ctx.clip();
+  const cr2Scale = Math.max(subW / src.width, subH / (src.height * 0.35));
+  ctx.drawImage(src, 0, src.height*0.3, src.width, src.height*0.35, subX, sub2Y, src.width*cr2Scale, src.height*0.35*cr2Scale);
+  const sd2 = ctx.getImageData(subX, sub2Y, subW, subH);
+  for (let i = 0; i < sd2.data.length; i += 4) {
+    let l = sd2.data[i]*0.299 + sd2.data[i+1]*0.587 + sd2.data[i+2]*0.114;
+    l = l < 80 ? l * 0.4 : Math.min(255, l * 1.1);
+    sd2.data[i] = sd2.data[i+1] = sd2.data[i+2] = l;
+  }
+  ctx.putImageData(sd2, subX, sub2Y);
+  ctx.restore();
+
+  // Right data panel (signal + specs)
+  const rpX = W - 240, rpY = sub2Y + subH + 30, rpW = 222, rpH = 260;
+  drawPanel(ctx, rpX, rpY, rpW, rpH);
+  let ry = rpY + 16;
+  ctx.font = '7px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.fillText('SIGNAL  信号', rpX + 12, ry);
+  ry += 14;
+
+  // Big freq number
+  ctx.font = '700 36px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.fillText('2.4', rpX + 12, ry + 28);
+  ctx.font = '11px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.fillText('GHZ', rpX + 115, ry + 28);
+  ry += 46;
+
+  // Mini spectrum bars
+  for (let i = 0; i < 18; i++) {
+    const bh = Math.random() * 30 + 4;
+    const alpha = 0.08 + Math.random() * 0.22;
+    ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+    ctx.fillRect(rpX + 12 + i * 11, ry + 40 - bh, 8, bh);
+  }
+  ry += 50;
+
+  // Tiny signal data
+  ctx.font = '8px "Share Tech Mono", monospace';
+  const sigLines = [
+    `PWR: -${randInt(30,60)}DBM  CH: ${randInt(1,48)}`,
+    `BW: ${randFloat(12,54,1)}MBPS  SNR: ${randInt(15,40)}DB`,
+    `AES-256 ACTIVE`,
+    `LATENCY: ${randInt(2,18)}MS`,
+    `NODES: ${randInt(3,12)}  UPLINK: OK`,
   ];
-  for (let i = 0; i < data.length; i++) {
-    ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.fillText(data[i], x+10, y+40+i*22);
+  for (const line of sigLines) {
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.fillText(line, rpX + 12, ry);
+    ry += 14;
   }
 }
 
-/* --- WINDOW: Signal waveform (mid-right) --- */
-function drawWinSignal(ctx) {
-  const x = W - M - 300, y = 460, w = 300, h = 200;
-  drawPanel(ctx, x, y, w, h, 'SIGNAL INTERCEPT');
-
-  // Waveform
-  ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1;
-  ctx.beginPath();
-  for (let i = 0; i < 270; i++) {
-    const wx = x+15+i;
-    const wy = y+65 + Math.sin(i*0.055)*22 + Math.sin(i*0.14)*10 + (Math.random()-0.5)*5;
-    if (i===0) ctx.moveTo(wx,wy); else ctx.lineTo(wx,wy);
-  }
-  ctx.stroke();
-  // Baseline
-  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-  ctx.beginPath(); ctx.moveTo(x+15,y+65); ctx.lineTo(x+w-15,y+65); ctx.stroke();
-
-  // Spectrum bars
-  for (let i=0; i<34; i++) {
-    const bh = Math.random()*35+5;
-    ctx.fillStyle = `rgba(255,255,255,${0.1+Math.random()*0.25})`;
-    ctx.fillRect(x+15+i*8, y+130-bh, 5, bh);
-  }
-  // Labels
-  ctx.font = '8px "Share Tech Mono", monospace'; ctx.fillStyle = 'rgba(255,255,255,0.35)';
-  ctx.fillText(`FREQ: 2.4GHZ  PWR: -${randInt(30,60)}DBM  CH-${randInt(1,48)}`, x+10, y+155);
-  ctx.fillText(`ENCRYPT: AES-256  LATENCY: ${randInt(2,18)}MS`, x+10, y+172);
-}
-
-/* --- WINDOW: System info (bottom-left) --- */
-function drawWinSystem(ctx) {
-  const x = M, y = H - 340, w = 350, h = 265;
-  drawPanel(ctx, x, y, w, h, 'SYSTEM // CLASSIFICATION');
-
-  ctx.font = '9px "Share Tech Mono", monospace';
-  const lines = [
-    { l: 'CLASSIFICATION:', v: 'UNCLASSIFIED', c: 'rgba(255,255,255,0.7)' },
-    { l: 'SYSTEM:', v: 'DARK SCANNER RECON v3.1.0', c: 'rgba(255,255,255,0.45)' },
-    { l: 'MODEL:', v: 'EFFICIENTDET / BLAZEFACE', c: 'rgba(255,255,255,0.45)' },
-    { l: 'POSE:', v: 'LANDMARKER-LITE', c: 'rgba(255,255,255,0.45)' },
-    { l: 'OPERATOR:', v: '[REDACTED]', c: 'rgba(255,255,255,0.25)' },
-    { l: 'AUTH:', v: `${randHex(8)}-${randHex(4)}-${randHex(4)}`, c: 'rgba(255,255,255,0.25)' },
-    { l: 'SESSION:', v: `DS-${Date.now().toString(36).toUpperCase()}`, c: 'rgba(255,255,255,0.25)' },
-  ];
-  for (let i = 0; i < lines.length; i++) {
-    ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillText(lines[i].l, x+10, y+40+i*20);
-    ctx.fillStyle = lines[i].c; ctx.fillText(lines[i].v, x+130, y+40+i*20);
-  }
-
-  // Barcode
-  drawBarcode(ctx, x+10, y+190, 200, 32);
-  ctx.font = '8px "Share Tech Mono", monospace'; ctx.fillStyle = 'rgba(255,255,255,0.3)';
-  const now = new Date();
-  ctx.fillText(`DSK-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${String(randInt(1,999)).padStart(3,'0')}`, x+10, y+234);
-}
-
-/* --- WINDOW: Biometric/face data (bottom-right) --- */
-function drawWinBiometric(ctx, results) {
-  const x = W - M - 320, y = H - 300, w = 320, h = 225;
-  drawPanel(ctx, x, y, w, h, 'BIOMETRIC // FACE SCAN');
-
-  const hasFace = results.faceResults.detections.length > 0;
-  ctx.font = '9px "Share Tech Mono", monospace';
-
-  const fields = [
-    ['MATCH', hasFace ? 'NO RECORD' : 'N/A'],
-    ['AGE EST', hasFace ? `${randInt(20,45)}` : '--'],
-    ['DB SEARCH', hasFace ? `${randInt(40,92)}%` : '0%'],
-    ['EXPRESSION', hasFace ? ['NEUTRAL','CALM','FOCUSED'][randInt(0,2)] : '--'],
-    ['IRIS', hasFace ? 'SCANNING...' : 'N/A'],
-    ['GAIT PATTERN', 'NORMAL'],
-    ['HEART RATE', `${randInt(62,82)} BPM`],
-    ['RESP RATE', `${randInt(12,20)} RPM`],
-    ['SKIN TEMP', `${randFloat(36.1,37.2,1)}°C`],
-  ];
-  for (let i = 0; i < fields.length; i++) {
-    const fy = y + 38 + i * 20;
-    ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillText(fields[i][0]+':', x+10, fy);
-    ctx.fillStyle = 'rgba(255,255,255,0.65)'; ctx.fillText(fields[i][1], x+130, fy);
-  }
-}
-
-/* --- WINDOW: Mini data strip (mid-left) --- */
-function drawWinMiniData(ctx) {
-  const x = M, y = 420, w = 260, h = 110;
-  drawPanel(ctx, x, y, w, h, 'ACQUISITION');
-  ctx.font = '9px "Share Tech Mono", monospace';
-  const data = [
-    `SS: 1/${[60,125,250,500][randInt(0,3)]}S`,
-    `FL: ${randInt(24,85)}MM  EV: ${randFloat(-2,2,1)}`,
-    `GAIN: ${randFloat(0,12,1)}DB  FPS: ${[24,30,60][randInt(0,2)]}`,
-  ];
-  for (let i=0; i<data.length; i++) {
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
-    ctx.fillText(data[i], x+10, y+40+i*22);
-  }
-}
-
-/* --- WINDOW: Detection stats (center-bottom overlay) --- */
-function drawWinStats(ctx, results, procTime) {
-  const w = 420, h = 60;
-  const x = (W - w) / 2, y = H - 380;
-  drawPanel(ctx, x, y, w, h, 'DETECTION SUMMARY');
+/* ===== LAYER 8: Detection stats strip (bottom overlay) ===== */
+function drawStatsBanner(ctx, results, procTime) {
+  const by = H - 400;
+  const bw = W, bh = 80;
+  drawPanel(ctx, 0, by, bw, bh, { bg: 'rgba(0,0,0,0.5)', border: false });
 
   const obj = results.objectResults.detections.length;
   const face = results.faceResults.detections.length;
   const pose = results.poseResults.landmarks.length;
   const pers = results.objectResults.detections.filter(d=>d.categories[0].categoryName==='person').length;
 
-  ctx.font = '10px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.6)';
-  ctx.fillText(`OBJ: ${obj}  PERS: ${pers}  FACE: ${face}  POSE: ${pose}  PROC: ${procTime}MS`, x+12, y+45);
-}
-
-/* --- WINDOW: QR block (floating, mid area) --- */
-function drawWinQR(ctx) {
-  const x = W - M - 130, y = 240, w = 130, h = 155;
-  drawPanel(ctx, x, y, w, h, 'AUTH TOKEN');
-  // QR grid
-  const cell = 4, qx = x+15, qy = y+30;
-  const cols = 24, rows = 24;
-  for (const [cx,cy] of [[0,0],[cols-4,0],[0,rows-4]]) {
-    for (let r=0;r<4;r++) for (let c=0;c<4;c++) {
-      if (r===0||r===3||c===0||c===3||( r>=1&&r<=2&&c>=1&&c<=2)) {
-        ctx.fillStyle = 'rgba(255,255,255,0.4)';
-        ctx.fillRect(qx+(cx+c)*cell, qy+(cy+r)*cell, cell-1, cell-1);
-      }
-    }
-  }
-  for (let r=0;r<rows;r++) for (let c=0;c<cols;c++) {
-    if (c<4&&r<4) continue; if (c>=cols-4&&r<4) continue; if (c<4&&r>=rows-4) continue;
-    if (Math.random()>0.5) {
-      ctx.fillStyle = `rgba(255,255,255,${0.12+Math.random()*0.18})`;
-      ctx.fillRect(qx+c*cell, qy+r*cell, cell-1, cell-1);
-    }
-  }
-  ctx.font = '7px "Share Tech Mono", monospace'; ctx.fillStyle = 'rgba(255,255,255,0.25)';
-  ctx.fillText(randHex(12), x+10, y+140);
-}
-
-/* --- WINDOW: Network panel (small, mid-left lower) --- */
-function drawWinNetwork(ctx) {
-  const x = M, y = 570, w = 220, h = 100;
-  drawPanel(ctx, x, y, w, h, 'NET // COMMS');
-  ctx.font = '8px "Share Tech Mono", monospace';
-  const data = [
-    `PROTOCOL: TLS 1.3`,
-    `BANDWIDTH: ${randFloat(12,54,1)} MBPS`,
-    `PACKET LOSS: ${randFloat(0,0.3,2)}%`,
-    `UPLINK: SECURED`,
+  const stats = [
+    { label: 'OBJECTS', value: String(obj) },
+    { label: 'PERSONS', value: String(pers) },
+    { label: 'FACES', value: String(face) },
+    { label: 'POSES', value: String(pose) },
+    { label: 'PROC', value: `${procTime}MS` },
   ];
-  for (let i=0;i<data.length;i++) {
-    ctx.fillStyle = 'rgba(255,255,255,0.4)';
-    ctx.fillText(data[i], x+10, y+38+i*15);
+
+  let sx = 30;
+  for (const s of stats) {
+    ctx.font = '700 32px "Share Tech Mono", monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillText(s.value, sx, by + 42);
+    ctx.font = '7px "Share Tech Mono", monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.fillText(s.label, sx, by + 58);
+    sx += 140;
+  }
+
+  // RESTRICTED stamp right-aligned
+  ctx.font = '700 18px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.15)';
+  ctx.textAlign = 'right';
+  ctx.fillText('RESTRICTED', W - 30, by + 42);
+  ctx.font = '7px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.2)';
+  ctx.fillText('AUTHORIZED PERSONNEL ONLY', W - 30, by + 58);
+  ctx.textAlign = 'left';
+}
+
+/* ===== LAYER 9: System info panel (bottom-left, over photo) ===== */
+function drawSystemPanel(ctx) {
+  const px = 16, py = H - 310, pw = 460, ph = 120;
+  drawPanel(ctx, px, py, pw, ph);
+
+  ctx.font = '8px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.25)';
+  const lines = [
+    `SYSTEM: DARK SCANNER RECON v3.1.0`,
+    `DETECTOR: EFFICIENTDET-LITE0 FP16 // BLAZEFACE // LANDMARKER-LITE`,
+    `POSE: LANDMARKER-LITE (33PT)  OPERATOR: [REDACTED]`,
+    `AUTH: ${randHex(8)}-${randHex(4)}-${randHex(4)}`,
+    `SESSION: DS-${Date.now().toString(36).toUpperCase()}  UPTIME: ${randInt(1,72)}H ${randInt(0,59)}M`,
+  ];
+  for (let i = 0; i < lines.length; i++) {
+    ctx.fillText(lines[i], px + 14, py + 18 + i * 16);
+  }
+
+  // Small barcode inside panel
+  drawBarcode(ctx, px + 14, py + ph - 24, 200, 14);
+}
+
+/* ===== LAYER 10: Bottom footer (over photo) ===== */
+function drawBottomFooter(ctx) {
+  const fy = H - 170;
+  drawPanel(ctx, 0, fy, W, 170, { bg: 'rgba(0,0,0,0.6)', border: false });
+
+  // Thin top line
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(20, fy + 4); ctx.lineTo(W - 20, fy + 4); ctx.stroke();
+
+  // Tagline
+  ctx.font = '700 13px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  ctx.fillText('TACTICAL IMAGE ANALYSIS', 20, fy + 30);
+  ctx.fillText('FOR MODERN SURVEILLANCE', 20, fy + 48);
+
+  // URL
+  ctx.font = '8px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  ctx.fillText('HTTPS://PAUL13131313.GITHUB.IO/DARK-SCANNER', 20, fy + 72);
+
+  // Brand right
+  ctx.font = '700 14px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.textAlign = 'right';
+  ctx.fillText('DSK.SYSTEMS', W - 20, fy + 30);
+  ctx.font = '8px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.25)';
+  ctx.fillText('暗号走査系統', W - 20, fy + 48);
+  ctx.textAlign = 'left';
+
+  // Barcode (bottom left)
+  drawBarcode(ctx, 20, H - 70, 300, 28);
+  ctx.font = '7px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.2)';
+  const now = new Date();
+  ctx.fillText(`DSK-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${randHex(6)}`, 20, H - 36);
+
+  // QR block (bottom right)
+  drawQRBlock(ctx, W - 90, H - 90, 3.5, 20, 20);
+  ctx.font = '7px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.2)';
+  ctx.textAlign = 'right';
+  ctx.fillText(randHex(12), W - 20, H - 10);
+  ctx.textAlign = 'left';
+
+  // Number row (01 02 ... 08)
+  ctx.font = '9px "Share Tech Mono", monospace';
+  const nrY = fy + 90;
+  for (let i = 1; i <= 8; i++) {
+    const nx = 20 + (i - 1) * 48;
+    ctx.fillStyle = i === 4 ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.15)';
+    ctx.fillText(String(i).padStart(2, '0'), nx, nrY);
+    if (i === 4) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(nx, nrY + 3); ctx.lineTo(nx + 14, nrY + 3); ctx.stroke();
+    }
   }
 }
 
-/* ===== LAYER 4: Global overlay effects ===== */
+/* ===== LAYER 11: Scanlines ===== */
 function drawScanlines(ctx) {
-  ctx.fillStyle = 'rgba(0,0,0,0.025)';
+  ctx.fillStyle = 'rgba(0,0,0,0.03)';
   for (let y = 0; y < H; y += 4) ctx.fillRect(0, y, W, 2);
 }
 
@@ -957,27 +1004,38 @@ async function renderHUD(sourceImage, results) {
   const ctx = hudCtx;
   ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
 
-  // Layer 1: Full-bleed photo
-  drawFullImage(ctx, sourceImage);
+  // Layer 1: Photo fills entire canvas
+  drawPhoto(ctx, sourceImage);
 
-  // Layer 2: Detection overlays directly on photo
+  // Layer 2: X-cross + grid
+  drawCrossLines(ctx);
+
+  // Layer 3: Detection overlays
   drawDetections(ctx, results, sourceImage);
 
-  // Layer 3: Floating HUD windows scattered over photo
-  drawHeaderBar(ctx);
-  drawWinSubject(ctx, results);
-  drawWinTelemetry(ctx);
-  drawWinSignal(ctx);
-  drawWinMiniData(ctx);
-  drawWinNetwork(ctx);
-  drawWinQR(ctx);
-  drawWinStats(ctx, results, results.procTime);
-  drawWinSystem(ctx);
-  drawWinBiometric(ctx, results);
-  drawFooterBar(ctx, results, results.procTime);
+  // Layer 4: Giant typography
+  drawGiantText(ctx);
 
-  // Layer 4: Global effects
-  drawCornerBrackets(ctx, 6, 6, W-12, H-12, 40, 2, 'rgba(255,255,255,0.2)');
+  // Layer 5: Header panel
+  drawHeaderPanel(ctx);
+
+  // Layer 6: Left data panel
+  drawLeftPanel(ctx, results);
+
+  // Layer 7: Right side panels
+  drawRightPanels(ctx, sourceImage, results);
+
+  // Layer 8: Stats strip
+  drawStatsBanner(ctx, results, results.procTime);
+
+  // Layer 9: System panel
+  drawSystemPanel(ctx);
+
+  // Layer 10: Bottom footer
+  drawBottomFooter(ctx);
+
+  // Layer 11: Global effects
+  drawCornerBrackets(ctx, 4, 4, W-8, H-8, 40, 1.5, 'rgba(255,255,255,0.08)');
   drawScanlines(ctx);
 }
 
@@ -985,7 +1043,6 @@ async function renderHUD(sourceImage, results) {
 function savePNG() {
   hudCanvas.toBlob(async (blob) => {
     const filename = `dark-scanner-${Date.now()}.png`;
-    // Try Web Share API for mobile
     if (navigator.share && navigator.canShare) {
       const file = new File([blob], filename, { type: 'image/png' });
       const shareData = { files: [file] };
@@ -998,7 +1055,6 @@ function savePNG() {
         }
       }
     }
-    // Fallback: download
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -1043,7 +1099,6 @@ btnScan.addEventListener('click', async () => {
   const capturedCanvas = captureFrame();
   stopCamera();
 
-  // Convert canvas to image for MediaPipe
   const img = new Image();
   img.onload = async () => {
     const results = await analyzeImage(img);
