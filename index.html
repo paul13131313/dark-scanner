@@ -664,52 +664,61 @@ function drawDetections(ctx, results, src) {
 
 /* ===== LAYER 4: GIANT typography (overlaid on photo) ===== */
 function drawGiantText(ctx) {
-  // "SCAN" — MASSIVE top-right
+  // "RECON" — MASSIVE top-right
   ctx.font = '900 180px "Share Tech Mono", monospace';
   ctx.fillStyle = 'rgba(255,255,255,0.15)';
   ctx.textAlign = 'right';
-  ctx.fillText('SCAN', W - 10, 200);
+  ctx.fillText('RECON', W - 10, 200);
   // ".XX" — big number below
   ctx.font = '900 100px "Share Tech Mono", monospace';
   ctx.fillStyle = 'rgba(255,255,255,0.30)';
   ctx.fillText(`.${String(randInt(1,12)).padStart(2,'0')}`, W - 10, 290);
   ctx.textAlign = 'left';
 
-  // "DARK SCANNER" — huge vertical watermark, center-left
+  // "SIGNAL INTERCEPT" — huge vertical watermark, center-left
   ctx.save();
   ctx.translate(90, H * 0.58);
   ctx.rotate(-Math.PI / 2);
   ctx.font = '900 130px "Share Tech Mono", monospace';
   ctx.fillStyle = 'rgba(255,255,255,0.05)';
   ctx.textAlign = 'center';
-  ctx.fillText('DARK SCANNER', 0, 0);
+  ctx.fillText('SIGNAL INTERCEPT', 0, 0);
   ctx.restore();
 
-  // "RECON" — huge horizontal text across the mid-right area
+  // "DETECT" — huge horizontal text across the mid-right area
   ctx.font = '900 200px "Share Tech Mono", monospace';
   ctx.fillStyle = 'rgba(255,255,255,0.04)';
   ctx.textAlign = 'right';
-  ctx.fillText('RECON', W + 20, H * 0.52);
+  ctx.fillText('DETECT', W + 20, H * 0.52);
   ctx.textAlign = 'left';
 
   // ===== FULL-WIDTH BOLD WHITE TEXT — photo lower area =====
-  // Primary: big readable white English text at photo bottom
-  ctx.font = '900 86px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.22)';
-  ctx.fillText('SUBJECT', 20, H - 470);
-  ctx.font = '900 86px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.22)';
-  ctx.fillText('ANALYSIS', 20, H - 390);
+  // Scale text using canvas transform to GUARANTEE full-width fit
+  function drawFullWidthText(ctx, text, y, alpha) {
+    const pad = 20;
+    const targetW = W - pad * 2;
+    ctx.save();
+    // Measure at a fixed size, then scale horizontally to fill width
+    const baseSize = 140;
+    ctx.font = `900 ${baseSize}px "Share Tech Mono", monospace`;
+    const measured = ctx.measureText(text).width;
+    const scaleX = targetW / measured;
+    ctx.translate(pad, y);
+    ctx.scale(scaleX, 1);
+    ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+    ctx.fillText(text, 0, 0);
+    ctx.restore();
+  }
 
-  // Secondary line — smaller but still clearly readable
-  ctx.font = '900 42px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.15)';
-  ctx.fillText('DARK PROTOCOL // 暗号走査', 20, H - 330);
+  // Line 1: fills ENTIRE width edge-to-edge
+  drawFullWidthText(ctx, 'SUBJECT IDENTIFIED', H - 430, 0.22);
+  // Line 2: fills ENTIRE width edge-to-edge
+  drawFullWidthText(ctx, 'THREAT LEVEL: ACTIVE', H - 300, 0.13);
 
-  // "CLASSIFIED" — LARGE red stamp, mid-screen
+  // "TOP SECRET" — LARGE red stamp, mid-screen
   ctx.font = '900 56px "Share Tech Mono", monospace';
   ctx.fillStyle = 'rgba(255,60,60,0.12)';
-  ctx.fillText('CLASSIFIED', 24, H * 0.46);
+  ctx.fillText('TOP SECRET', 24, H * 0.46);
 
   // "EYES ONLY" — right side, medium-large
   ctx.font = '900 42px "Share Tech Mono", monospace';
@@ -746,17 +755,17 @@ function drawGiantText(ctx) {
   ctx.font = '900 24px "Share Tech Mono", monospace';
   ctx.fillStyle = 'rgba(255,255,255,0.30)';
   ctx.textAlign = 'center';
-  ctx.fillText('■  CLASSIFIED  //  AUTHORIZED  PERSONNEL  ONLY  ■', W / 2, alertY + 4);
+  ctx.fillText('■  CLASSIFIED  //  DO  NOT  DISTRIBUTE  ■', W / 2, alertY + 4);
   ctx.textAlign = 'left';
 
-  // Repeating "CLASSIFIED" ticker tape
+  // Repeating "CONFIDENTIAL" ticker tape
   ctx.font = '900 14px "Share Tech Mono", monospace';
   ctx.fillStyle = 'rgba(255,255,255,0.08)';
   const tickerY = H * 0.88;
   let tickerX = 0;
   while (tickerX < W) {
-    ctx.fillText('CLASSIFIED', tickerX, tickerY);
-    tickerX += 140;
+    ctx.fillText('CONFIDENTIAL', tickerX, tickerY);
+    tickerX += 160;
   }
 }
 
@@ -1208,74 +1217,224 @@ function drawBottomFooter(ctx) {
 
 /* ===== LAYER 11: Fingerprint biometric data ===== */
 function drawFingerprint(ctx) {
-  // Fingerprint positioned bottom-right of photo area, above the stats
-  const fpX = W - 180, fpY = H - 560;
-  const fpSize = 120;
+  const fpX = W - 190, fpY = H - 600;
+  const fpW = 160, fpH = 200;
 
   // Panel background
-  drawPanel(ctx, fpX - 14, fpY - 24, fpSize + 28, fpSize + 64, { bg: 'rgba(0,0,0,0.85)', borderColor: 'rgba(255,60,60,0.2)' });
+  drawPanel(ctx, fpX - 10, fpY - 24, fpW + 20, fpH + 70, { bg: 'rgba(0,0,0,0.90)', borderColor: 'rgba(255,60,60,0.3)' });
   ctx.font = '700 9px "Share Tech Mono", monospace';
   ctx.fillStyle = 'rgba(255,60,60,0.8)';
-  ctx.fillText('■  BIOMETRIC_FP', fpX - 8, fpY - 10);
+  ctx.fillText('■  BIOMETRIC_FP', fpX - 4, fpY - 10);
 
-  // Draw fingerprint using concentric ellipses with randomized deformation
-  const cx = fpX + fpSize / 2;
-  const cy = fpY + fpSize / 2;
-  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-  ctx.lineWidth = 1.5;
+  // === Ultra-realistic fingerprint rendering ===
+  // Seeded pseudo-random for consistent fingerprint per render
+  let fpSeed = 42;
+  function fpRand() { fpSeed = (fpSeed * 16807 + 0) % 2147483647; return fpSeed / 2147483647; }
 
-  // Seed a pseudo-random pattern using time
-  const seed = Date.now() % 1000;
-
-  for (let ring = 0; ring < 12; ring++) {
-    const rx = 6 + ring * 4.5;
-    const ry = 8 + ring * 4.8;
-    ctx.beginPath();
-    for (let a = 0; a < Math.PI * 2; a += 0.08) {
-      // Add slight deformation for natural fingerprint look
-      const deform = Math.sin(a * 3 + ring * 0.7 + seed * 0.01) * (1 + ring * 0.3);
-      const px = cx + Math.cos(a) * (rx + deform);
-      const py = cy + Math.sin(a) * (ry + deform);
-      if (a === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  // Noise function for organic irregularity
+  function noise(x, y) {
+    const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+    return n - Math.floor(n);
+  }
+  function smoothNoise(x, y) {
+    const ix = Math.floor(x), iy = Math.floor(y);
+    const fx = x - ix, fy = y - iy;
+    const a = noise(ix, iy), b = noise(ix+1, iy);
+    const c = noise(ix, iy+1), d = noise(ix+1, iy+1);
+    const u = fx*fx*(3-2*fx), v = fy*fy*(3-2*fy);
+    return a*(1-u)*(1-v) + b*u*(1-v) + c*(1-u)*v + d*u*v;
+  }
+  function fbm(x, y) {
+    let val = 0, amp = 0.5;
+    for (let i = 0; i < 4; i++) {
+      val += smoothNoise(x, y) * amp;
+      x *= 2; y *= 2; amp *= 0.5;
     }
-    ctx.closePath();
-    ctx.strokeStyle = `rgba(255,255,255,${0.15 + (ring % 3 === 0 ? 0.15 : 0)})`;
-    ctx.stroke();
+    return val;
   }
 
-  // Arch lines at top of fingerprint
-  for (let i = 0; i < 5; i++) {
-    ctx.beginPath();
-    const archY = cy - fpSize * 0.35 + i * 5;
-    ctx.moveTo(cx - 30 - i * 3, archY + 10);
-    ctx.quadraticCurveTo(cx, archY - 10 + i * 2, cx + 30 + i * 3, archY + 10);
-    ctx.strokeStyle = `rgba(255,255,255,${0.12 + i * 0.03})`;
-    ctx.stroke();
-  }
+  const cx = fpX + fpW / 2;
+  const cy = fpY + fpH * 0.44;
+  const rW = fpW * 0.44;
+  const rH = fpH * 0.44;
 
-  // Scanning line effect
-  const scanLineY = fpY + (Date.now() % 3000) / 3000 * fpSize;
-  ctx.strokeStyle = 'rgba(255,60,60,0.5)';
-  ctx.lineWidth = 1;
+  // Clip to fingerprint oval shape
+  ctx.save();
   ctx.beginPath();
-  ctx.moveTo(fpX, scanLineY);
-  ctx.lineTo(fpX + fpSize, scanLineY);
+  ctx.ellipse(cx, cy + 6, rW + 4, rH + 10, 0, 0, Math.PI * 2);
+  ctx.clip();
+
+  // --- Core whorl: two tight interlocking delta spirals ---
+  for (let s = 0; s < 2; s++) {
+    ctx.beginPath();
+    let first = true;
+    for (let t = 0; t < 16; t += 0.08) {
+      const r = 0.02 + t * 0.032;
+      const a = t * 1.15 + s * Math.PI;
+      // Add organic wobble via fbm noise
+      const wobX = (fbm(t * 2 + s * 5, 0) - 0.5) * 0.03;
+      const wobY = (fbm(0, t * 2 + s * 5) - 0.5) * 0.03;
+      const px = cx + (Math.cos(a) * r + wobX) * rW;
+      const py = cy + (Math.sin(a) * r * 1.25 + wobY) * rH;
+      if (first) { ctx.moveTo(px, py); first = false; } else ctx.lineTo(px, py);
+    }
+    // Varying thickness per ridge — subtle core
+    ctx.strokeStyle = `rgba(255,255,255,${0.22 + fpRand() * 0.08})`;
+    ctx.lineWidth = 0.8 + fpRand() * 0.4;
+    ctx.stroke();
+  }
+
+  // --- Concentric loop ridges flowing around the core ---
+  // Loop-type fingerprint: ridges recurve on themselves
+  const ridgeCount = 42;
+  for (let i = 0; i < ridgeCount; i++) {
+    const layer = i;
+    const baseR = 0.16 + layer * 0.022;
+    if (baseR > 1.15) break;
+
+    ctx.beginPath();
+    let first = true;
+    // Arc coverage grows with distance from core
+    const arcLen = Math.min(Math.PI * 2 - 0.3, Math.PI * 0.8 + layer * 0.065);
+    const arcOff = -Math.PI * 0.5 - layer * 0.015;
+    const steps = 60 + layer * 2;
+
+    for (let j = 0; j <= steps; j++) {
+      const t = j / steps;
+      const angle = arcOff + t * arcLen;
+
+      // Multi-frequency organic wobble
+      const w1 = Math.sin(t * Math.PI * 5 + layer * 0.7) * 0.006;
+      const w2 = Math.sin(t * Math.PI * 11 + layer * 1.3) * 0.003;
+      const w3 = (fbm(layer * 0.3 + t * 4, layer * 0.7) - 0.5) * 0.018;
+      const bulge = Math.sin(t * Math.PI) * 0.02;
+      const r = baseR + w1 + w2 + w3 + bulge;
+
+      // Elliptical distortion: taller than wide, slightly asymmetric
+      const asymm = 1 + Math.sin(angle + 0.5) * 0.06;
+      const px = cx + Math.cos(angle) * r * rW * 0.92 * asymm;
+      const py = cy + Math.sin(angle) * r * rH * 1.18;
+      if (first) { ctx.moveTo(px, py); first = false; } else ctx.lineTo(px, py);
+    }
+
+    // Variable thickness and opacity — some ridges thicker, some faded
+    const thickVar = 0.8 + fbm(layer * 1.7, 3.0) * 0.8;
+    const alphaVar = 0.20 + (layer % 3 === 0 ? 0.10 : 0) + fbm(layer * 0.5, 7) * 0.06;
+    ctx.strokeStyle = `rgba(255,255,255,${alphaVar})`;
+    ctx.lineWidth = thickVar;
+    ctx.stroke();
+  }
+
+  // --- Horizontal bottom ridges (delta area below the loop core) ---
+  for (let i = 0; i < 10; i++) {
+    const yOff = 0.52 + i * 0.052;
+    ctx.beginPath();
+    let first = true;
+    for (let j = 0; j <= 40; j++) {
+      const t = j / 40;
+      const x = -0.95 + t * 1.9;
+      // Ridges curve upward in center, organic noise added
+      const curve = -Math.sin(t * Math.PI) * (0.04 + i * 0.008);
+      const nz = (fbm(x * 3 + i, yOff * 5) - 0.5) * 0.015;
+      const px = cx + x * rW;
+      const py = cy + (yOff + curve + nz) * rH;
+      if (first) { ctx.moveTo(px, py); first = false; } else ctx.lineTo(px, py);
+    }
+    ctx.strokeStyle = `rgba(255,255,255,${0.12 + (i % 2 === 0 ? 0.07 : 0)})`;
+    ctx.lineWidth = 0.7 + fbm(i * 2.3, 1) * 0.5;
+    ctx.stroke();
+  }
+
+  // --- Top arch ridges (above the loop core, flowing over it) ---
+  for (let i = 0; i < 6; i++) {
+    const yBase = -0.55 - i * 0.055;
+    ctx.beginPath();
+    let first = true;
+    for (let j = 0; j <= 35; j++) {
+      const t = j / 35;
+      const x = -0.8 + t * 1.6;
+      const arch = Math.sin(t * Math.PI) * (0.03 + i * 0.005);
+      const nz = (fbm(x * 2 + i * 3, yBase * 4) - 0.5) * 0.01;
+      const px = cx + x * rW;
+      const py = cy + (yBase + arch + nz) * rH;
+      if (first) { ctx.moveTo(px, py); first = false; } else ctx.lineTo(px, py);
+    }
+    ctx.strokeStyle = `rgba(255,255,255,${0.10 + (i % 2 === 0 ? 0.06 : 0)})`;
+    ctx.lineWidth = 0.6 + fpRand() * 0.5;
+    ctx.stroke();
+  }
+
+  // --- Pore dots along ridges (tiny bright spots) ---
+  for (let i = 0; i < 40; i++) {
+    const angle = fpRand() * Math.PI * 2;
+    const dist = 0.1 + fpRand() * 0.7;
+    const px = cx + Math.cos(angle) * dist * rW * 0.9;
+    const py = cy + Math.sin(angle) * dist * rH * 1.1;
+    ctx.fillStyle = `rgba(255,255,255,${0.08 + fpRand() * 0.12})`;
+    ctx.beginPath(); ctx.arc(px, py, 0.4 + fpRand() * 0.6, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // --- Ridge endings and bifurcations (minutiae) ---
+  const minutiae = [];
+  for (let i = 0; i < 16; i++) {
+    const a = fpRand() * Math.PI * 2;
+    const d = 0.15 + fpRand() * 0.65;
+    minutiae.push([
+      cx + Math.cos(a) * d * rW * 0.85,
+      cy + Math.sin(a) * d * rH * 1.05,
+      fpRand() > 0.5 ? 'ending' : 'bifurc'
+    ]);
+  }
+  for (const [mx, my, type] of minutiae) {
+    if (type === 'ending') {
+      // Ridge ending: small red square
+      ctx.fillStyle = 'rgba(255,60,60,0.35)';
+      ctx.fillRect(mx - 1.5, my - 1.5, 3, 3);
+    } else {
+      // Bifurcation: tiny Y-shape
+      ctx.strokeStyle = 'rgba(255,60,60,0.35)';
+      ctx.lineWidth = 0.7;
+      ctx.beginPath();
+      ctx.moveTo(mx, my + 3); ctx.lineTo(mx, my);
+      ctx.lineTo(mx - 2, my - 3); ctx.moveTo(mx, my);
+      ctx.lineTo(mx + 2, my - 3);
+      ctx.stroke();
+    }
+  }
+
+  ctx.restore(); // End clipping
+
+  // Fingerprint oval border (partial, like a scanned edge)
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + 6, rW + 4, rH + 10, 0, -0.3, Math.PI + 0.3);
   ctx.stroke();
 
-  // Data labels below fingerprint
-  const labelY = fpY + fpSize + 10;
-  ctx.font = '900 14px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.7)';
-  ctx.fillText('FP-MATCH', fpX - 8, labelY);
-  ctx.font = '900 14px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,60,60,0.8)';
-  ctx.fillText(`${randInt(87,99)}.${randInt(1,9)}%`, fpX + 70, labelY);
+  // Scan line with glow
+  const scanProgress = (Date.now() % 3000) / 3000;
+  const scanY = fpY + scanProgress * fpH;
+  ctx.strokeStyle = 'rgba(255,60,60,0.5)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(fpX, scanY); ctx.lineTo(fpX + fpW, scanY); ctx.stroke();
+  const scanGrad = ctx.createLinearGradient(fpX, scanY - 15, fpX, scanY + 15);
+  scanGrad.addColorStop(0, 'rgba(255,60,60,0)');
+  scanGrad.addColorStop(0.5, 'rgba(255,60,60,0.08)');
+  scanGrad.addColorStop(1, 'rgba(255,60,60,0)');
+  ctx.fillStyle = scanGrad;
+  ctx.fillRect(fpX, scanY - 15, fpW, 30);
 
-  // Minutiae count
+  // Data labels
+  const labelY = fpY + fpH + 8;
+  ctx.font = '900 16px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.fillText('FP-MATCH', fpX - 4, labelY);
+  ctx.fillStyle = 'rgba(255,60,60,0.9)';
+  ctx.fillText(`${randInt(87,99)}.${randInt(1,9)}%`, fpX + 100, labelY);
+
   ctx.font = '700 9px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.4)';
-  ctx.fillText(`MINUTIAE: ${randInt(42,78)}  TYPE: WHORL`, fpX - 8, labelY + 16);
-  ctx.fillText(`LATENT: ${randHex(8).toUpperCase()}`, fpX - 8, labelY + 28);
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.fillText(`MINUTIAE: ${randInt(42,78)}  TYPE: LOOP`, fpX - 4, labelY + 16);
+  ctx.fillText(`LATENT: ${randHex(8).toUpperCase()}`, fpX - 4, labelY + 30);
 }
 
 /* ===== LAYER 12: Scanlines ===== */
