@@ -506,11 +506,11 @@ function drawQRBlock(ctx, qx, qy, cellSize, cols, rows) {
 
 /* Draw a clean data panel with semi-transparent BG */
 function drawPanel(ctx, x, y, w, h, opts = {}) {
-  ctx.fillStyle = opts.bg || 'rgba(0,0,0,0.65)';
+  ctx.fillStyle = opts.bg || 'rgba(0,0,0,0.82)';
   ctx.fillRect(x, y, w, h);
   if (opts.border !== false) {
-    ctx.strokeStyle = opts.borderColor || 'rgba(255,255,255,0.1)';
-    ctx.lineWidth = 0.5;
+    ctx.strokeStyle = opts.borderColor || 'rgba(255,255,255,0.18)';
+    ctx.lineWidth = 1.5;
     ctx.strokeRect(x, y, w, h);
   }
 }
@@ -562,20 +562,32 @@ function drawPhoto(ctx, src) {
 
 /* ===== LAYER 2: X-cross + grid lines (over photo) ===== */
 function drawCrossLines(ctx) {
-  // Diagonal X
-  ctx.strokeStyle = 'rgba(255,255,255,0.06)'; ctx.lineWidth = 1;
+  // Diagonal X — bolder
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(W, H); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(W, 0); ctx.lineTo(0, H); ctx.stroke();
 
   // Center cross
-  ctx.strokeStyle = 'rgba(255,255,255,0.035)';
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)'; ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.moveTo(0, H/2); ctx.lineTo(W, H/2); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(W/2, 0); ctx.lineTo(W/2, H); ctx.stroke();
 
-  // Subtle grid
-  ctx.strokeStyle = 'rgba(255,255,255,0.02)'; ctx.lineWidth = 0.5;
+  // Grid — slightly bolder
+  ctx.strokeStyle = 'rgba(255,255,255,0.03)'; ctx.lineWidth = 1;
   for (let x = 0; x < W; x += 60) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
   for (let y = 0; y < H; y += 60) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+  // Corner frame markers — new bold element
+  const cm = 40;
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 3;
+  // Top-left
+  ctx.beginPath(); ctx.moveTo(M, M+cm); ctx.lineTo(M, M); ctx.lineTo(M+cm, M); ctx.stroke();
+  // Top-right
+  ctx.beginPath(); ctx.moveTo(W-M-cm, M); ctx.lineTo(W-M, M); ctx.lineTo(W-M, M+cm); ctx.stroke();
+  // Bottom-left
+  ctx.beginPath(); ctx.moveTo(M, H-M-cm); ctx.lineTo(M, H-M); ctx.lineTo(M+cm, H-M); ctx.stroke();
+  // Bottom-right
+  ctx.beginPath(); ctx.moveTo(W-M-cm, H-M); ctx.lineTo(W-M, H-M); ctx.lineTo(W-M, H-M-cm); ctx.stroke();
 }
 
 /* ===== LAYER 3: Detection overlays (on full photo) ===== */
@@ -598,7 +610,7 @@ function drawDetections(ctx, results, src) {
     const bw = b.width * scale;
     const bh = b.height * scale;
     const bl = Math.min(bw, bh) * 0.12;
-    ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1.5;
+    ctx.strokeStyle = 'rgba(255,255,255,0.75)'; ctx.lineWidth = 2.5;
     ctx.beginPath(); ctx.moveTo(bx, by+bl); ctx.lineTo(bx, by); ctx.lineTo(bx+bl, by); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(bx+bw-bl, by); ctx.lineTo(bx+bw, by); ctx.lineTo(bx+bw, by+bl); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(bx, by+bh-bl); ctx.lineTo(bx, by+bh); ctx.lineTo(bx+bl, by+bh); ctx.stroke();
@@ -606,8 +618,8 @@ function drawDetections(ctx, results, src) {
     const isPerson = label === 'PERSON';
     const dLabel = isPerson ? `SUBJ-${subjNames[pIdx]||pIdx}` : label;
     if (isPerson) pIdx++;
-    ctx.font = '700 12px "Share Tech Mono", monospace';
-    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.font = '900 14px "Share Tech Mono", monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
     ctx.textAlign = 'left'; ctx.fillText(dLabel, bx+4, by-6);
     ctx.textAlign = 'right'; ctx.fillText(`${score}%`, bx+bw-4, by-6);
     ctx.textAlign = 'left';
@@ -616,7 +628,7 @@ function drawDetections(ctx, results, src) {
   // --- Pose skeleton ---
   for (const lm of results.poseResults.landmarks) {
     const pts = lm.map(p => ({ x: p.x*sW*scale+baseOX, y: p.y*sH*scale+baseOY, v: p.visibility }));
-    ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 2;
     for (const [a,b] of POSE_CONNECTIONS) {
       if (a>=pts.length||b>=pts.length) continue;
       if (pts[a].v<0.4||pts[b].v<0.4) continue;
@@ -624,8 +636,8 @@ function drawDetections(ctx, results, src) {
     }
     for (const p of pts) {
       if (p.v<0.4) continue;
-      ctx.fillStyle = 'rgba(255,255,255,0.35)';
-      ctx.beginPath(); ctx.arc(p.x, p.y, 2.5, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.beginPath(); ctx.arc(p.x, p.y, 3.5, 0, Math.PI*2); ctx.fill();
     }
   }
 
@@ -635,10 +647,10 @@ function drawDetections(ctx, results, src) {
     const fcx = b.originX*scale+baseOX + b.width*scale/2;
     const fcy = b.originY*scale+baseOY + b.height*scale/2;
     const r = Math.max(b.width,b.height)*scale*0.5;
-    ctx.setLineDash([8,5]); ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 1.5;
+    ctx.setLineDash([10,6]); ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 2.5;
     ctx.beginPath(); ctx.arc(fcx,fcy,r,0,Math.PI*2); ctx.stroke();
     ctx.setLineDash([]);
-    ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 3;
     for (let i=0;i<4;i++) {
       const a = i*Math.PI/2;
       ctx.beginPath();
@@ -651,230 +663,440 @@ function drawDetections(ctx, results, src) {
 
 /* ===== LAYER 4: GIANT typography (overlaid on photo) ===== */
 function drawGiantText(ctx) {
-  // "SCAN.XX" — massive, top-right, overlapping photo
-  ctx.font = '700 140px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.12)';
+  // "SCAN" — MASSIVE top-right
+  ctx.font = '900 180px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.15)';
   ctx.textAlign = 'right';
-  ctx.fillText(`SCAN`, W - 20, 180);
-  ctx.font = '700 80px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.25)';
-  ctx.fillText(`.${String(randInt(1,12)).padStart(2,'0')}`, W - 20, 250);
+  ctx.fillText('SCAN', W - 10, 200);
+  // ".XX" — big number below
+  ctx.font = '900 100px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.30)';
+  ctx.fillText(`.${String(randInt(1,12)).padStart(2,'0')}`, W - 10, 290);
   ctx.textAlign = 'left';
 
-  // "DARK SCANNER" — huge watermark, center-left, over the body
+  // "DARK SCANNER" — huge vertical watermark, center-left
   ctx.save();
-  ctx.translate(80, H * 0.55);
+  ctx.translate(90, H * 0.58);
   ctx.rotate(-Math.PI / 2);
-  ctx.font = '700 110px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.04)';
+  ctx.font = '900 130px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.05)';
   ctx.textAlign = 'center';
   ctx.fillText('DARK SCANNER', 0, 0);
   ctx.restore();
 
-  // Japanese accent — 暗号走査 — bottom area
-  ctx.font = '700 72px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.07)';
+  // "RECON" — huge horizontal text across the mid-right area
+  ctx.font = '900 200px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.04)';
+  ctx.textAlign = 'right';
+  ctx.fillText('RECON', W + 20, H * 0.52);
   ctx.textAlign = 'left';
-  ctx.fillText('暗号走査', 30, H - 460);
+
+  // Japanese accent — 暗号走査 — bottom area, bigger and bolder
+  ctx.font = '900 88px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.09)';
+  ctx.fillText('暗号走査', 24, H - 440);
+
+  // "CLASSIFIED" — LARGE red stamp, mid-screen
+  ctx.font = '900 56px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,60,60,0.12)';
+  ctx.fillText('CLASSIFIED', 24, H * 0.46);
+
+  // "EYES ONLY" — right side, medium-large
+  ctx.font = '900 42px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  ctx.textAlign = 'right';
+  ctx.fillText('EYES ONLY', W - 20, H * 0.70);
+  ctx.textAlign = 'left';
+
+  // "TARGET ACQUIRED" — bottom-left, medium
+  ctx.font = '900 36px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,60,60,0.10)';
+  ctx.fillText('TARGET ACQUIRED', 24, H * 0.58);
+
+  // Hex code — medium
+  ctx.font = '700 28px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.07)';
+  ctx.fillText(`0x${randHex(16)}`, 24, H * 0.64);
+
+  // "NO UNAUTHORIZED ACCESS" — watermark, bottom-right
+  ctx.font = '700 22px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.05)';
+  ctx.textAlign = 'right';
+  ctx.fillText('NO UNAUTHORIZED ACCESS', W - 24, H * 0.78);
+  ctx.textAlign = 'left';
+
+  // ===== FULL-WIDTH DIGITAL WARNING BANNERS =====
+  // These stretch across the entire canvas width like emergency alerts
+
+  // "WARNING" — full-width, top-mid area, with red background stripe
+  const warnY = H * 0.33;
+  ctx.fillStyle = 'rgba(255,20,20,0.06)';
+  ctx.fillRect(0, warnY - 50, W, 70);
+  ctx.font = '900 72px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,40,40,0.14)';
+  ctx.textAlign = 'center';
+  ctx.fillText('⚠  W A R N I N G  ⚠', W / 2, warnY);
+  ctx.textAlign = 'left';
+
+  // "UNAUTHORIZED ACCESS PROHIBITED" — full-width, lower area
+  const uaY = H * 0.84;
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.fillRect(0, uaY - 28, W, 40);
+  ctx.strokeStyle = 'rgba(255,60,60,0.2)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(0, uaY - 28); ctx.lineTo(W, uaY - 28); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, uaY + 12); ctx.lineTo(W, uaY + 12); ctx.stroke();
+  ctx.font = '900 30px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  ctx.textAlign = 'center';
+  ctx.fillText('UNAUTHORIZED  ACCESS  PROHIBITED', W / 2, uaY + 2);
+  ctx.textAlign = 'left';
+
+  // "D A N G E R" — ultra-wide letter-spaced, behind photo subject
+  ctx.font = '900 120px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,30,30,0.06)';
+  ctx.textAlign = 'center';
+  ctx.fillText('D A N G E R', W / 2, H * 0.42);
+  ctx.textAlign = 'left';
+
+  // Repeating "CLASSIFIED" ticker tape across bottom
+  ctx.font = '900 14px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,60,60,0.12)';
+  const tickerY = H * 0.88;
+  let tickerX = 0;
+  while (tickerX < W) {
+    ctx.fillText('CLASSIFIED', tickerX, tickerY);
+    tickerX += 140;
+  }
 }
 
 /* ===== LAYER 5: Top header panel (over photo) ===== */
 function drawHeaderPanel(ctx) {
-  drawPanel(ctx, 0, 0, W, 52);
+  drawPanel(ctx, 0, 0, W, 58, { bg: 'rgba(0,0,0,0.88)' });
   const ts = formatTimestamp();
-  ctx.font = '700 18px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.textAlign = 'left';
-  ctx.fillText('DARK SCANNER', 20, 34);
+  ctx.font = '900 22px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.textAlign = 'left';
+  ctx.fillText('DARK SCANNER', 20, 38);
 
-  // REC indicator
+  // REC indicator — bigger
   ctx.fillStyle = '#ff3333';
-  ctx.beginPath(); ctx.arc(260, 30, 4, 0, Math.PI*2); ctx.fill();
-  ctx.font = '10px "Share Tech Mono", monospace';
-  ctx.fillStyle = '#ff3333'; ctx.fillText('REC', 270, 34);
+  ctx.beginPath(); ctx.arc(280, 33, 6, 0, Math.PI*2); ctx.fill();
+  ctx.font = '700 13px "Share Tech Mono", monospace';
+  ctx.fillStyle = '#ff3333'; ctx.fillText('REC', 292, 38);
 
-  ctx.font = '9px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.3)';
-  ctx.fillText('CAM-01 // RECON v3.1', 320, 34);
+  ctx.font = '700 11px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.45)';
+  ctx.fillText('CAM-01 // RECON v3.1', 340, 38);
+
+  // Red separator line at bottom of header
+  ctx.fillStyle = 'rgba(255,60,60,0.4)';
+  ctx.fillRect(0, 56, W, 2);
 
   ctx.textAlign = 'right';
-  ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.font = '11px "Share Tech Mono", monospace';
-  ctx.fillText(`${ts.date}  ${ts.time}`, W - 20, 34);
+  ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.font = '700 13px "Share Tech Mono", monospace';
+  ctx.fillText(`${ts.date}  ${ts.time}`, W - 20, 38);
   ctx.textAlign = 'left';
 }
 
 /* ===== LAYER 6: Left data panel (over photo, semi-transparent) ===== */
 function drawLeftPanel(ctx, results) {
-  const px = 16, py = 68, pw = 240, ph = 420;
-  drawPanel(ctx, px, py, pw, ph);
+  const px = 16, py = 68, pw = 280, ph = 680;
+  drawPanel(ctx, px, py, pw, ph, { bg: 'rgba(0,0,0,0.88)' });
+  // Red accent line on left edge — thicker
+  ctx.fillStyle = 'rgba(255,60,60,0.7)';
+  ctx.fillRect(px, py, 3, ph);
 
-  let y = py + 18;
-  const x = px + 14;
+  let y = py + 22;
+  const x = px + 16;
 
   // Section: ORGANIZATION
-  ctx.font = '7px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.font = '700 9px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
   ctx.fillText('ORGANIZATION  組織', x, y);
-  ctx.font = '11px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.8)';
-  ctx.fillText('DSK.SYSTEMS', x, y + 14);
-  y += 36;
+  ctx.font = '700 14px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.fillText('DSK.SYSTEMS', x, y + 18);
+  y += 42;
 
   // Section: COLLECTION
-  ctx.font = '7px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.font = '700 9px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
   ctx.fillText('COLLECTION  収集', x, y);
-  ctx.font = '11px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.8)';
-  ctx.fillText('RECON-3-SURVEILLANCE', x, y + 14);
-  y += 36;
+  ctx.font = '700 14px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.fillText('RECON-3-SURVEILLANCE', x, y + 18);
+  y += 42;
 
   // Section: SESSION
-  ctx.font = '7px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.font = '700 9px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
   ctx.fillText('SESSION  区分', x, y);
-  ctx.font = '11px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.8)';
+  ctx.font = '700 14px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
   const ts = formatTimestamp();
-  ctx.fillText(ts.date + ' // ' + ts.time, x, y + 14);
-  y += 36;
+  ctx.fillText(ts.date + ' // ' + ts.time, x, y + 18);
+  y += 42;
 
-  // Separator
-  ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + pw - 28, y); ctx.stroke();
-  y += 14;
+  // Separator — thicker, red
+  ctx.strokeStyle = 'rgba(255,60,60,0.3)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + pw - 32, y); ctx.stroke();
+  y += 16;
 
   // Section: CODENAME with icon
-  ctx.font = '7px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.font = '700 9px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
   ctx.fillText('CODENAME  識別', x, y);
-  y += 16;
-  // Crosshair icon
-  ctx.strokeStyle = 'rgba(255,255,255,0.45)'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.arc(x+8, y+2, 6, 0, Math.PI*2); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x+8, y-4); ctx.lineTo(x+8, y+8); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(x+2, y+2); ctx.lineTo(x+14, y+2); ctx.stroke();
-  ctx.font = '700 12px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.8)';
-  ctx.fillText(`DSK-RN${randInt(1,9)}-SC${randInt(10,99)}-BK`, x + 22, y + 6);
-  y += 28;
+  y += 18;
+  ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(x+10, y+2, 8, 0, Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x+10, y-6); ctx.lineTo(x+10, y+10); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(x+2, y+2); ctx.lineTo(x+18, y+2); ctx.stroke();
+  ctx.font = '900 16px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.fillText(`DSK-RN${randInt(1,9)}-SC${randInt(10,99)}-BK`, x + 26, y + 6);
+  y += 30;
 
   // Separator
-  ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + pw - 28, y); ctx.stroke();
-  y += 14;
+  ctx.strokeStyle = 'rgba(255,60,60,0.3)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + pw - 32, y); ctx.stroke();
+  y += 18;
 
-  // Subject data rows
+  // === THREAT LEVEL — BIG ===
+  const threatLevels = ['LOW','MODERATE','ELEVATED','HIGH'];
+  const threatIdx = randInt(0,3);
+  const threat = threatLevels[threatIdx];
+  ctx.font = '700 9px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.fillText('THREAT LEVEL  脅威', x, y);
+  y += 6;
+  ctx.font = '900 38px "Share Tech Mono", monospace';
+  ctx.fillStyle = threatIdx >= 2 ? 'rgba(255,60,60,0.95)' : 'rgba(255,255,255,0.9)';
+  ctx.fillText(threat, x, y + 32);
+  y += 42;
+  // Confidence bar — thicker
+  const conf = randInt(40, 98);
+  ctx.fillStyle = 'rgba(255,255,255,0.12)';
+  ctx.fillRect(x, y, pw - 32, 8);
+  ctx.fillStyle = threatIdx >= 2 ? 'rgba(255,60,60,0.7)' : 'rgba(255,255,255,0.5)';
+  ctx.fillRect(x, y, (pw - 32) * conf / 100, 8);
+  ctx.font = '700 9px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.fillText(`${conf}%`, x + pw - 56, y + 7);
+  y += 24;
+
+  // Subject data rows — bigger
   const persons = results.objectResults.detections.filter(d=>d.categories[0].categoryName==='person');
   const hasFace = results.faceResults.detections.length > 0;
   const fields = [
     ['STATUS', 'ACTIVE'],
     ['CLASS', persons.length > 0 ? 'CIVILIAN' : 'UNKNOWN'],
-    ['THREAT', ['LOW','MODERATE','ELEVATED','HIGH'][randInt(0,3)]],
     ['HR', `${randInt(62,82)} BPM`],
     ['THERMAL', `${randFloat(36.1,37.2,1)}°C`],
     ['BIOMETRIC', hasFace ? 'SCANNING' : 'N/A'],
     ['BEARING', `${randInt(0,359)}°`],
     ['RANGE', `${randFloat(1.0,8.0,1)}M`],
+    ['PROTOCOL', 'AES-256'],
+    ['SIGNAL', `${randInt(-60,-20)}dBm`],
   ];
   for (const f of fields) {
-    ctx.font = '7px "Share Tech Mono", monospace';
-    ctx.fillStyle = 'rgba(255,255,255,0.3)'; ctx.fillText(f[0], x, y);
-    ctx.font = '10px "Share Tech Mono", monospace';
-    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillText(f[1], x + 68, y);
-    y += 17;
+    ctx.font = '700 9px "Share Tech Mono", monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.45)'; ctx.fillText(f[0], x, y);
+    ctx.font = '700 13px "Share Tech Mono", monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.85)'; ctx.fillText(f[1], x + 80, y);
+    y += 20;
   }
+
+  // === Heart rate waveform (bigger graph) ===
+  y += 10;
+  ctx.font = '700 9px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,60,60,0.7)';
+  ctx.fillText('HR WAVEFORM', x, y);
+  y += 10;
+  ctx.strokeStyle = 'rgba(255,60,60,0.6)'; ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  for (let i = 0; i < pw - 32; i++) {
+    const wx = x + i;
+    const phase = (i / (pw - 32)) * Math.PI * 6;
+    let val = Math.sin(phase) * 4;
+    if (i % 38 < 4) val = -20 + Math.random() * 40; // QRS spike
+    const wy = y + 22 + val;
+    if (i===0) ctx.moveTo(wx,wy); else ctx.lineTo(wx,wy);
+  }
+  ctx.stroke();
+
+  // === Mini barcode at bottom of left panel ===
+  y += 50;
+  drawBarcode(ctx, x, y, pw - 40, 16);
+}
+
+/* ===== Thermal colormap for sub-images ===== */
+function thermalColor(lum) {
+  let r, g, b;
+  if (lum < 0.2) {
+    const t = lum / 0.2;
+    r = 0; g = 0; b = Math.round(40 + t * 140);
+  } else if (lum < 0.4) {
+    const t = (lum - 0.2) / 0.2;
+    r = 0; g = Math.round(t * 160); b = Math.round(180 - t * 80);
+  } else if (lum < 0.6) {
+    const t = (lum - 0.4) / 0.2;
+    r = Math.round(t * 220); g = Math.round(160 + t * 60); b = Math.round(100 - t * 100);
+  } else if (lum < 0.8) {
+    const t = (lum - 0.6) / 0.2;
+    r = Math.round(220 + t * 35); g = Math.round(220 - t * 140); b = 0;
+  } else {
+    const t = (lum - 0.8) / 0.2;
+    r = 255; g = Math.round(80 + t * 175); b = Math.round(t * 200);
+  }
+  return [r, g, b];
+}
+
+function applyThermalFilter(ctx, x, y, w, h) {
+  const imageData = ctx.getImageData(x, y, w, h);
+  const d = imageData.data;
+  // Block-pixelate first, then apply thermal colormap
+  const blockSize = 6;
+  for (let by = 0; by < h; by += blockSize) {
+    for (let bx = 0; bx < w; bx += blockSize) {
+      // Average luminance in block
+      let lumSum = 0, count = 0;
+      for (let dy = 0; dy < blockSize && by + dy < h; dy++) {
+        for (let dx = 0; dx < blockSize && bx + dx < w; dx++) {
+          const idx = ((by + dy) * w + (bx + dx)) * 4;
+          lumSum += (d[idx] * 0.299 + d[idx+1] * 0.587 + d[idx+2] * 0.114) / 255;
+          count++;
+        }
+      }
+      const avgLum = lumSum / count;
+      // Quantize to 8 levels for harsh thermal look
+      const qLum = Math.round(avgLum * 8) / 8;
+      const [r, g, b] = thermalColor(qLum);
+      // Fill entire block with thermal color
+      for (let dy = 0; dy < blockSize && by + dy < h; dy++) {
+        for (let dx = 0; dx < blockSize && bx + dx < w; dx++) {
+          const idx = ((by + dy) * w + (bx + dx)) * 4;
+          d[idx] = r; d[idx+1] = g; d[idx+2] = b;
+        }
+      }
+    }
+  }
+  ctx.putImageData(imageData, x, y);
 }
 
 /* ===== LAYER 7: Right side panels (over photo) ===== */
 function drawRightPanels(ctx, src, results) {
-  // Sub-image panel 1 (cropped face/upper body)
+  // Sub-image panel 1 — THERMAL IMAGING (face/upper body)
   const subX = W - 200, subY = 300, subW = 170, subH = 190;
-  drawPanel(ctx, subX - 4, subY - 16, subW + 8, subH + 20, { bg: 'rgba(0,0,0,0.55)' });
-  ctx.font = '7px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.35)';
-  ctx.fillText('■  PROFILE_CLOSE', subX, subY - 4);
+  drawPanel(ctx, subX - 4, subY - 16, subW + 8, subH + 20, { bg: 'rgba(0,0,0,0.75)', borderColor: 'rgba(255,60,60,0.35)' });
+  ctx.font = '700 9px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,60,60,0.8)';
+  ctx.fillText('■  THERMAL_SCAN', subX, subY - 4);
 
   ctx.save();
   ctx.beginPath(); ctx.rect(subX, subY, subW, subH); ctx.clip();
   const crScale = Math.max(subW / src.width, subH / (src.height * 0.35));
   ctx.drawImage(src, 0, 0, src.width, src.height * 0.35, subX, subY, src.width * crScale, src.height * 0.35 * crScale);
-  const sd1 = ctx.getImageData(subX, subY, subW, subH);
-  for (let i = 0; i < sd1.data.length; i += 4) {
-    let l = sd1.data[i]*0.299 + sd1.data[i+1]*0.587 + sd1.data[i+2]*0.114;
-    l = l < 80 ? l * 0.4 : Math.min(255, l * 1.1);
-    sd1.data[i] = sd1.data[i+1] = sd1.data[i+2] = l;
-  }
-  ctx.putImageData(sd1, subX, subY);
   ctx.restore();
+  // Apply thermal colormap
+  applyThermalFilter(ctx, subX, subY, subW, subH);
+  // Thermal temp label — bigger
+  ctx.font = '900 20px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,120,60,0.9)';
+  ctx.fillText(`${randFloat(36.2,37.4,1)}°C`, subX + 4, subY + subH - 8);
+  // Red border accent — thicker
+  ctx.strokeStyle = 'rgba(255,60,60,0.45)'; ctx.lineWidth = 2;
+  ctx.strokeRect(subX, subY, subW, subH);
 
-  // Sub-image panel 2 (mid body crop)
+  // Sub-image panel 2 — BIOMETRIC SCAN (mid body, also thermal)
   const sub2Y = subY + subH + 26;
-  drawPanel(ctx, subX - 4, sub2Y - 16, subW + 8, subH + 20, { bg: 'rgba(0,0,0,0.55)' });
-  ctx.font = '7px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.35)';
-  ctx.fillText('■  DETAIL_MID', subX, sub2Y - 4);
+  drawPanel(ctx, subX - 4, sub2Y - 16, subW + 8, subH + 20, { bg: 'rgba(0,0,0,0.75)', borderColor: 'rgba(255,60,60,0.35)' });
+  ctx.font = '700 9px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,60,60,0.8)';
+  ctx.fillText('■  BIOMETRIC_IR', subX, sub2Y - 4);
 
   ctx.save();
   ctx.beginPath(); ctx.rect(subX, sub2Y, subW, subH); ctx.clip();
   const cr2Scale = Math.max(subW / src.width, subH / (src.height * 0.35));
   ctx.drawImage(src, 0, src.height*0.3, src.width, src.height*0.35, subX, sub2Y, src.width*cr2Scale, src.height*0.35*cr2Scale);
-  const sd2 = ctx.getImageData(subX, sub2Y, subW, subH);
-  for (let i = 0; i < sd2.data.length; i += 4) {
-    let l = sd2.data[i]*0.299 + sd2.data[i+1]*0.587 + sd2.data[i+2]*0.114;
-    l = l < 80 ? l * 0.4 : Math.min(255, l * 1.1);
-    sd2.data[i] = sd2.data[i+1] = sd2.data[i+2] = l;
-  }
-  ctx.putImageData(sd2, subX, sub2Y);
   ctx.restore();
+  applyThermalFilter(ctx, subX, sub2Y, subW, subH);
+  // Temp label — bigger
+  ctx.font = '900 20px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,120,60,0.9)';
+  ctx.fillText(`${randFloat(35.8,36.8,1)}°C`, subX + 4, sub2Y + subH - 8);
+  ctx.strokeStyle = 'rgba(255,60,60,0.45)'; ctx.lineWidth = 2;
+  ctx.strokeRect(subX, sub2Y, subW, subH);
 
-  // Right data panel (signal + specs)
-  const rpX = W - 240, rpY = sub2Y + subH + 30, rpW = 222, rpH = 260;
-  drawPanel(ctx, rpX, rpY, rpW, rpH);
-  let ry = rpY + 16;
-  ctx.font = '7px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.35)';
-  ctx.fillText('SIGNAL  信号', rpX + 12, ry);
-  ry += 14;
+  // Right data panel (signal + specs) — bigger, bolder
+  const rpX = W - 260, rpY = sub2Y + subH + 30, rpW = 242, rpH = 340;
+  drawPanel(ctx, rpX, rpY, rpW, rpH, { bg: 'rgba(0,0,0,0.85)', borderColor: 'rgba(255,60,60,0.25)' });
+  // Red accent line top — thicker
+  ctx.fillStyle = 'rgba(255,60,60,0.6)';
+  ctx.fillRect(rpX, rpY, rpW, 3);
 
-  // Big freq number
-  ctx.font = '700 36px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.85)';
-  ctx.fillText('2.4', rpX + 12, ry + 28);
-  ctx.font = '11px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.35)';
-  ctx.fillText('GHZ', rpX + 115, ry + 28);
-  ry += 46;
+  let ry = rpY + 20;
+  ctx.font = '700 10px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.fillText('SIGNAL  信号', rpX + 14, ry);
+  ry += 16;
 
-  // Mini spectrum bars
-  for (let i = 0; i < 18; i++) {
-    const bh = Math.random() * 30 + 4;
-    const alpha = 0.08 + Math.random() * 0.22;
-    ctx.fillStyle = `rgba(255,255,255,${alpha})`;
-    ctx.fillRect(rpX + 12 + i * 11, ry + 40 - bh, 8, bh);
+  // Big freq number — bolder
+  ctx.font = '900 52px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.95)';
+  ctx.fillText('2.4', rpX + 14, ry + 38);
+  ctx.font = '900 20px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.fillText('GHZ', rpX + 145, ry + 38);
+  ry += 56;
+
+  // Bigger spectrum bars — thicker
+  for (let i = 0; i < 20; i++) {
+    const bh = Math.random() * 60 + 10;
+    const alpha = 0.15 + Math.random() * 0.45;
+    const isRed = Math.random() > 0.6;
+    ctx.fillStyle = isRed ? `rgba(255,80,60,${alpha})` : `rgba(255,255,255,${alpha})`;
+    ctx.fillRect(rpX + 14 + i * 11, ry + 65 - bh, 9, bh);
   }
-  ry += 50;
+  ry += 74;
 
-  // Tiny signal data
-  ctx.font = '8px "Share Tech Mono", monospace';
+  // Waveform line — thicker
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i = 0; i < rpW - 28; i++) {
+    const wx = rpX + 14 + i;
+    const wy = ry + 12 + Math.sin(i*0.05)*10 + Math.sin(i*0.13)*6 + (Math.random()-0.5)*3;
+    if (i===0) ctx.moveTo(wx,wy); else ctx.lineTo(wx,wy);
+  }
+  ctx.stroke();
+  ry += 32;
+
+  // Signal data — bigger, bolder
+  ctx.font = '700 11px "Share Tech Mono", monospace';
   const sigLines = [
     `PWR: -${randInt(30,60)}DBM  CH: ${randInt(1,48)}`,
     `BW: ${randFloat(12,54,1)}MBPS  SNR: ${randInt(15,40)}DB`,
-    `AES-256 ACTIVE`,
-    `LATENCY: ${randInt(2,18)}MS`,
+    `AES-256 ACTIVE  LAT: ${randInt(2,18)}MS`,
     `NODES: ${randInt(3,12)}  UPLINK: OK`,
   ];
   for (const line of sigLines) {
-    ctx.fillStyle = 'rgba(255,255,255,0.4)';
-    ctx.fillText(line, rpX + 12, ry);
-    ry += 14;
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.fillText(line, rpX + 14, ry);
+    ry += 18;
   }
+
+  // ENCRYPTED stamp — bigger, bolder
+  ctx.font = '900 22px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,60,60,0.35)';
+  ctx.fillText('ENCRYPTED', rpX + 14, ry + 12);
 }
 
 /* ===== LAYER 8: Detection stats strip (bottom overlay) ===== */
 function drawStatsBanner(ctx, results, procTime) {
-  const by = H - 400;
-  const bw = W, bh = 80;
-  drawPanel(ctx, 0, by, bw, bh, { bg: 'rgba(0,0,0,0.5)', border: false });
+  const by = H - 420;
+  const bw = W, bh = 100;
+  drawPanel(ctx, 0, by, bw, bh, { bg: 'rgba(0,0,0,0.8)', border: false });
+  // Top red accent line
+  ctx.fillStyle = 'rgba(255,60,60,0.4)';
+  ctx.fillRect(0, by, bw, 2);
 
   const obj = results.objectResults.detections.length;
   const face = results.faceResults.detections.length;
@@ -891,111 +1113,112 @@ function drawStatsBanner(ctx, results, procTime) {
 
   let sx = 30;
   for (const s of stats) {
-    ctx.font = '700 32px "Share Tech Mono", monospace';
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.fillText(s.value, sx, by + 42);
-    ctx.font = '7px "Share Tech Mono", monospace';
-    ctx.fillStyle = 'rgba(255,255,255,0.3)';
-    ctx.fillText(s.label, sx, by + 58);
-    sx += 140;
+    ctx.font = '900 40px "Share Tech Mono", monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.fillText(s.value, sx, by + 52);
+    ctx.font = '700 10px "Share Tech Mono", monospace';
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.fillText(s.label, sx, by + 70);
+    sx += 145;
   }
 
-  // RESTRICTED stamp right-aligned
-  ctx.font = '700 18px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.15)';
-  ctx.textAlign = 'right';
-  ctx.fillText('RESTRICTED', W - 30, by + 42);
-  ctx.font = '7px "Share Tech Mono", monospace';
+  // RESTRICTED stamp right-aligned — bigger, bolder
+  ctx.font = '900 24px "Share Tech Mono", monospace';
   ctx.fillStyle = 'rgba(255,255,255,0.2)';
-  ctx.fillText('AUTHORIZED PERSONNEL ONLY', W - 30, by + 58);
+  ctx.textAlign = 'right';
+  ctx.fillText('RESTRICTED', W - 30, by + 48);
+  ctx.font = '700 10px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  ctx.fillText('AUTHORIZED PERSONNEL ONLY', W - 30, by + 68);
   ctx.textAlign = 'left';
 }
 
 /* ===== LAYER 9: System info panel (bottom-left, over photo) ===== */
 function drawSystemPanel(ctx) {
-  const px = 16, py = H - 310, pw = 460, ph = 120;
-  drawPanel(ctx, px, py, pw, ph);
+  const px = 16, py = H - 330, pw = 520, ph = 140;
+  drawPanel(ctx, px, py, pw, ph, { bg: 'rgba(0,0,0,0.85)' });
 
-  ctx.font = '8px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.25)';
+  ctx.font = '700 10px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
   const lines = [
     `SYSTEM: DARK SCANNER RECON v3.1.0`,
     `DETECTOR: EFFICIENTDET-LITE0 FP16 // BLAZEFACE // LANDMARKER-LITE`,
     `POSE: LANDMARKER-LITE (33PT)  OPERATOR: [REDACTED]`,
     `AUTH: ${randHex(8)}-${randHex(4)}-${randHex(4)}`,
     `SESSION: DS-${Date.now().toString(36).toUpperCase()}  UPTIME: ${randInt(1,72)}H ${randInt(0,59)}M`,
+    `ENCRYPT: AES-256-GCM  STATUS: NOMINAL  BUILD: ${randInt(100,999)}`,
   ];
   for (let i = 0; i < lines.length; i++) {
-    ctx.fillText(lines[i], px + 14, py + 18 + i * 16);
+    ctx.fillText(lines[i], px + 14, py + 20 + i * 17);
   }
 
   // Small barcode inside panel
-  drawBarcode(ctx, px + 14, py + ph - 24, 200, 14);
+  drawBarcode(ctx, px + 14, py + ph - 26, 240, 16);
 }
 
 /* ===== LAYER 10: Bottom footer (over photo) ===== */
 function drawBottomFooter(ctx) {
-  const fy = H - 170;
-  drawPanel(ctx, 0, fy, W, 170, { bg: 'rgba(0,0,0,0.6)', border: false });
+  const fy = H - 180;
+  drawPanel(ctx, 0, fy, W, 180, { bg: 'rgba(0,0,0,0.85)', border: false });
 
-  // Thin top line
-  ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1;
+  // Top line — red, thicker
+  ctx.strokeStyle = 'rgba(255,60,60,0.35)'; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(20, fy + 4); ctx.lineTo(W - 20, fy + 4); ctx.stroke();
 
-  // Tagline
-  ctx.font = '700 13px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.6)';
-  ctx.fillText('TACTICAL IMAGE ANALYSIS', 20, fy + 30);
-  ctx.fillText('FOR MODERN SURVEILLANCE', 20, fy + 48);
+  // Tagline — bigger, bolder
+  ctx.font = '900 16px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.75)';
+  ctx.fillText('TACTICAL IMAGE ANALYSIS', 20, fy + 32);
+  ctx.fillText('FOR MODERN SURVEILLANCE', 20, fy + 52);
 
   // URL
-  ctx.font = '8px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.3)';
-  ctx.fillText('HTTPS://PAUL13131313.GITHUB.IO/DARK-SCANNER', 20, fy + 72);
+  ctx.font = '700 10px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.fillText('HTTPS://PAUL13131313.GITHUB.IO/DARK-SCANNER', 20, fy + 76);
 
-  // Brand right
-  ctx.font = '700 14px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  // Brand right — bigger
+  ctx.font = '900 18px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.65)';
   ctx.textAlign = 'right';
-  ctx.fillText('DSK.SYSTEMS', W - 20, fy + 30);
-  ctx.font = '8px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.25)';
-  ctx.fillText('暗号走査系統', W - 20, fy + 48);
+  ctx.fillText('DSK.SYSTEMS', W - 20, fy + 32);
+  ctx.font = '700 11px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.fillText('暗号走査系統', W - 20, fy + 52);
   ctx.textAlign = 'left';
 
-  // Barcode (bottom left)
-  drawBarcode(ctx, 20, H - 70, 300, 28);
-  ctx.font = '7px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.2)';
+  // Barcode (bottom left) — bigger
+  drawBarcode(ctx, 20, H - 72, 340, 32);
+  ctx.font = '700 9px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.3)';
   const now = new Date();
-  ctx.fillText(`DSK-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${randHex(6)}`, 20, H - 36);
+  ctx.fillText(`DSK-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${randHex(6)}`, 20, H - 34);
 
-  // QR block (bottom right)
-  drawQRBlock(ctx, W - 90, H - 90, 3.5, 20, 20);
-  ctx.font = '7px "Share Tech Mono", monospace';
-  ctx.fillStyle = 'rgba(255,255,255,0.2)';
+  // QR block (bottom right) — bigger
+  drawQRBlock(ctx, W - 100, H - 100, 4, 22, 22);
+  ctx.font = '700 9px "Share Tech Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.3)';
   ctx.textAlign = 'right';
   ctx.fillText(randHex(12), W - 20, H - 10);
   ctx.textAlign = 'left';
 
-  // Number row (01 02 ... 08)
-  ctx.font = '9px "Share Tech Mono", monospace';
-  const nrY = fy + 90;
-  for (let i = 1; i <= 8; i++) {
-    const nx = 20 + (i - 1) * 48;
-    ctx.fillStyle = i === 4 ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.15)';
+  // Number row (01 02 ... 10) — bigger
+  ctx.font = '700 12px "Share Tech Mono", monospace';
+  const nrY = fy + 96;
+  for (let i = 1; i <= 10; i++) {
+    const nx = 20 + (i - 1) * 44;
+    ctx.fillStyle = i === 4 ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.2)';
     ctx.fillText(String(i).padStart(2, '0'), nx, nrY);
     if (i === 4) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(nx, nrY + 3); ctx.lineTo(nx + 14, nrY + 3); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,60,60,0.5)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(nx, nrY + 4); ctx.lineTo(nx + 18, nrY + 4); ctx.stroke();
     }
   }
 }
 
 /* ===== LAYER 11: Scanlines ===== */
 function drawScanlines(ctx) {
-  ctx.fillStyle = 'rgba(0,0,0,0.03)';
-  for (let y = 0; y < H; y += 4) ctx.fillRect(0, y, W, 2);
+  ctx.fillStyle = 'rgba(0,0,0,0.04)';
+  for (let y = 0; y < H; y += 3) ctx.fillRect(0, y, W, 1);
 }
 
 /* ===== MASTER RENDER ===== */
